@@ -445,6 +445,7 @@
   .memo-preview{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:26px;max-width:760px;margin:0 auto}
   .memo-preview .mp-head{text-align:center;border-bottom:2px solid var(--slate);padding-bottom:12px;margin-bottom:16px}
   .memo-preview .mp-logo{height:52px;margin-bottom:8px}
+  .memo-preview .mp-logo-ph{display:inline-block;height:56px;width:150px;border:1px dashed #B7BEC8;border-radius:6px;color:#9AA3AE;font-size:10px;line-height:1.15;padding-top:14px;margin-bottom:8px;box-sizing:border-box}
   .memo-preview h3{font-size:15px;color:var(--slate)}
   .memo-preview .mp-sub{font-size:12px;color:var(--muted);margin-top:2px}
   .memo-table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0}
@@ -945,6 +946,7 @@
             <option value="ago">Agosto 2026</option>
           </select>
           <button class="btn btn-au" style="width:auto" onclick="runCalculo()">⚡ Calcular nómina</button>
+          <button class="btn btn-ghost btn-sm" style="width:auto" onclick="exportCaracas()">⬇ Exportar para Caracas (planta seleccionada)</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="addRetroactivo()">⇅ Cargar retroactivo</button>
           <button class="btn btn-au btn-sm" style="width:auto" onclick="recalcular1630()">⟳ Calcular descuento 16-30 (junio)</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="document.getElementById('arrFile').click()">⇊ Importar descuento 16-30</button>
@@ -2510,8 +2512,13 @@ function runCruce(){
       if(inc){conInc++;continue;}
       const marks=(BIO_MARKS[w.cedula]||{})[dateStr];
       let presente=false;
-      if(unaMarBasta){
-        presente = marks && (marks.am||marks.pm);          // basta una
+      if(es4896){
+        // Médicos 48/96: marcan a la ENTRADA (AM) y salen ~48h después (AM). Una marca cubre toda la guardia.
+        const mm=BIO_MARKS[w.cedula]||{};
+        const has=(dd)=>{const x=mm[`2026-${String(mesNum).padStart(2,'0')}-${String(dd).padStart(2,'0')}`];return !!(x&&(x.am||x.pm));};
+        presente = has(dia) || has(dia-1) || has(dia+1);   // el día, el anterior (entrada) o el siguiente (salida)
+      }else if(es21x7){
+        presente = marks && (marks.am||marks.pm);          // 21X7: basta una
       }else if(rot==='D'){
         presente = marks && marks.am && marks.pm;           // AM + PM
       }else{ // N: PM ese día + AM del día siguiente
@@ -3554,7 +3561,7 @@ function renderConceptos(){
 }
 
 function memoHeaderHTML(titulo){
-  const logo=LOGO_DATA?`<img src="${LOGO_DATA}" style="height:52px;margin-bottom:8px">`:'';
+  const logo=LOGO_DATA?`<img src="${LOGO_DATA}" style="height:52px;margin-bottom:8px">`:'<div style="display:inline-block;height:52px;width:150px;border:1px dashed #B7BEC8;border-radius:6px;color:#9AA3AE;font-size:10px;padding-top:14px;margin-bottom:8px;box-sizing:border-box">LOGO CVM</div>';
   return `<div style="text-align:center;border-bottom:2px solid #1C2530;padding-bottom:12px;margin-bottom:14px">
     ${logo}
     <div style="font-size:14px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
@@ -3686,13 +3693,13 @@ function renderMemoResumen(){
       </tbody>
     </table>`;
 
-  const logo=LOGO_DATA?`<img src="${LOGO_DATA}" class="mp-logo">`:'';
+  const logo=LOGO_DATA?`<img src="${LOGO_DATA}" class="mp-logo">`:'<div class="mp-logo-ph no-print-ph">LOGO CVM<br><small>(botón "Cargar logo")</small></div>';
   document.getElementById('calcResumen').innerHTML=`
     <div class="memo-preview" id="memoPreview">
       <div class="mp-head">
         ${logo}
-        <h3>REPÚBLICA BOLIVARIANA DE VENEZUELA</h3>
-        <div class="mp-sub">Corporación Venezolana de Minería — CVM</div>
+        <h3>CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</h3>
+        <div class="mp-sub">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
       </div>
       <p style="text-align:right;font-size:12.5px;margin:6px 0 12px">${fechaMemo}</p>
       <p style="font-size:12.5px;line-height:1.4;margin-bottom:10px">
@@ -3800,6 +3807,253 @@ function exportListado(name){
   downloadCSV(csv,'Listado_'+name.replace(/[^a-zA-Z0-9]/g,'_')+'_'+R.plant+'.csv');
   toast('Listado exportado');
 }
+/* ===================== EXPORTAR PARA CARACAS (Excel .xlsx) ===================== */
+function _asigParam(w){ return ({2:'ADM',2.5:'CONEXO',3:'OPERATIVO',3.5:'SUBTERRANEA'})[w.asignacion]||'OPERATIVO'; }
+
+function _listaQ1(plant){
+  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
+  const out=[];
+  workers.forEach(w=>{
+    const monto=(PARAMS[plant].cats[_asigParam(w)]?PARAMS[plant].cats[_asigParam(w)].monto:0);
+    const desc=diasDescuento(plant,w.cedula,'q1'); const dp=Math.max(0,30-desc);
+    const pago=Math.round(monto/30*dp)+retroDe(plant,w.cedula,'q1');
+    if(pago>0) out.push({ced:w.cedula,nombre:w.nombre,cargo:w.cargo||'',pago:Math.round(pago*100)/100});
+  });
+  return out;
+}
+function _listaQ2(plant){
+  if(!ARRASTRES.some(a=>a.plant===plant)) calcularDescuento1630(plant);
+  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
+  const out=[];
+  workers.forEach(w=>{
+    if(excluidoDeQ2(w.cedula))return;
+    const desc=diasDescuento(plant,w.cedula,'q2'); const dp=Math.max(0,30-desc);
+    const asist=Math.round(50/30*dp*100)/100, alim=Math.round(50/30*dp*100)/100;
+    const diasIPE=diasParaIPE(plant,w.cedula); const ipe=diasIPE>=16?0:(w.ipe||0);
+    const arr16=arrastreDe(plant,w.cedula); const retro=retroDe(plant,w.cedula,'q2');
+    out.push({ced:w.cedula,nombre:w.nombre,cargo:w.cargo||'',
+      asistAlim:Math.round((asist+alim+arr16)*100)/100, ipe:ipe, arr16:arr16,
+      total:Math.round((asist+alim+ipe+retro+arr16)*100)/100});
+  });
+  return out;
+}
+function _pagoAOA(titulo, plantN, mesTxt, fechaPago, lista, montoKey, montoLabel){
+  const tot=lista.reduce((s,x)=>s+(+x[montoKey]||0),0);
+  const aoa=[[titulo],[plantN],['MES: '+mesTxt],['FECHA DE PAGO: '+(fechaPago||'')],['','','','TOTAL',Math.round(tot*100)/100],
+    ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO',montoLabel,'FIRMA','FECHA','HUELLA']];
+  lista.forEach((x,i)=>aoa.push([i+1, x.ced, x.nombre, x.cargo, Math.round((+x[montoKey]||0)*100)/100, '', '', x.ced]));
+  return aoa;
+}
+function _addSheet(wb, aoa, name){
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:5},{wch:12},{wch:34},{wch:32},{wch:14},{wch:12},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, name.substring(0,31));
+}
+
+function _corridaAOA(plant, mesKey){
+  const prev=ROT_MES; ROT_MES=mesKey;
+  const nd=DIAS_MES[mesKey]||30;
+  const plantN=plant==='choco'?'PLANTA CHOCÓ':'MINA ISIDORA';
+  const mesNom={jun:'JUNIO 2026',jul:'JULIO 2026',may:'MAYO 2026',ago:'AGOSTO 2026'}[mesKey]||'';
+  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
+  const dias=Array.from({length:nd},(_,i)=>i+1);
+  const aoa=[['CÁLCULOS INCENTIVO POR PRODUCCIÓN · '+plantN],['MES: '+mesNom],[],
+    ['N°','CÉDULA','APELLIDOS Y NOMBRES','CARGO'].concat(dias)];
+  workers.forEach((w,i)=>{
+    let arr=new Array(nd).fill('');
+    try{ const r=corridaTrabajador(plant,w.cedula); if(r&&r.arr) arr=r.arr.map(c=>(c==='?'||c==null)?'':c); }catch(e){}
+    aoa.push([i+1, w.cedula, w.nombre, w.cargo||''].concat(arr.slice(0,nd)));
+  });
+  ROT_MES=prev;
+  return {aoa,nd};
+}
+function _asistenciaGridAOA(plant, prevMes, curMes){
+  const prevROT=ROT_MES;
+  const ndPrev=DIAS_MES[prevMes]||30, ndCur=DIAS_MES[curMes]||31;
+  const mesN={jun:6,jul:7,may:5,ago:8};
+  const nom={jun:'JUNIO',jul:'JULIO',may:'MAYO',ago:'AGOSTO'};
+  const dowN=['dom','lun','mar','mié','jue','vie','sáb'];
+  const dow0=(m)=> m==='jun'?DOW_JUN:(m==='jul'?DOW_JUL:1);
+  // definición de días: mes anterior 16..fin, mes actual 1..fin
+  const dd=[];
+  for(let d=16; d<=ndPrev; d++) dd.push({m:prevMes, i:d-1, num:d, mn:mesN[prevMes]||6, dw:dowN[(dow0(prevMes)+d-1)%7]});
+  for(let d=1; d<=ndCur; d++)  dd.push({m:curMes,  i:d-1, num:d, mn:mesN[curMes]||7,  dw:dowN[(dow0(curMes)+d-1)%7]});
+  const endH=['DÍAS A PAGAR','ASISTENCIA + ALIMENTACIÓN','IPE','ADSCRIPCIÓN','CUADRILLA','OBSERVACIÓN'];
+  const fechas=['INCENTIVO ASISTENCIA Y ALIMENTACIÓN · PERÍODO '+(nom[curMes]||'')+' 2026','',''];
+  const nums=['','',''];
+  const hdr=['CEDULA','NOMBRES Y APELLIDOS','CARGO SEGÚN NÓMINA'];
+  dd.forEach(x=>{ fechas.push(String(x.num).padStart(2,'0')+'/'+String(x.mn).padStart(2,'0')+'/2026'); nums.push(x.num); hdr.push(x.dw); });
+  endH.forEach(()=>{fechas.push('');nums.push('');}); endH.forEach(h=>hdr.push(h));
+  const aoa=[fechas,nums,hdr];
+  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
+  // precomputar corridas de ambos meses
+  const cP={}, cC={};
+  ROT_MES=prevMes; workers.forEach(w=>{try{const r=corridaTrabajador(plant,w.cedula);cP[w.cedula]=r?r.arr:[];}catch(e){cP[w.cedula]=[];}});
+  ROT_MES=curMes;  workers.forEach(w=>{try{const r=corridaTrabajador(plant,w.cedula);cC[w.cedula]=r?r.arr:[];}catch(e){cC[w.cedula]=[];}});
+  ROT_MES=prevROT;
+  workers.forEach(w=>{
+    const dias=dd.map(x=>{ const a=(x.m===prevMes?cP:cC)[w.cedula]||[]; const c=a[x.i]; return (c==='?'||c==null)?'':c; });
+    const desc=diasDescuento(plant,w.cedula,'q2'); const dp=Math.max(0,30-desc);
+    const asistAlim=Math.round((50/30*dp+50/30*dp+arrastreDe(plant,w.cedula))*100)/100;
+    const diasIPE=diasParaIPE(plant,w.cedula); const ipe=diasIPE>=16?0:(w.ipe||0);
+    const incs=INCIDENCIAS.filter(x=>x.plant===plant&&x.cedula===w.cedula);
+    const obs=incs.map(x=>x.code+' '+String(x.desde).slice(8,10)+'/'+String(x.desde).slice(5,7)+'-'+String(x.hasta).slice(8,10)+'/'+String(x.hasta).slice(5,7)).join(' · ');
+    aoa.push([w.cedula, w.nombre, w.cargo||''].concat(dias).concat([dp, asistAlim, ipe, w.adscripcion||'', w.cuadrilla||'', obs]));
+  });
+  return {aoa, ncols:3+dd.length+endH.length};
+}
+function _incidenciasGridAOA(plant, mesKey, quincena){
+  const prev=ROT_MES; ROT_MES=mesKey;
+  const nd=DIAS_MES[mesKey]||30;
+  const mesNum=({jun:6,jul:7,may:5,ago:8})[mesKey]||6;
+  const dowN=['dom','lun','mar','mié','jue','vie','sáb'];
+  const dow0 = mesKey==='jun'?DOW_JUN:(mesKey==='jul'?DOW_JUL:1);
+  const unidad={2:'ADM',2.5:'CONEXOS',3:'OPERACIONES',3.5:'OPERACIONES'};
+  const esBono=(quincena==='q1');
+  const colBono=['B. PRODUCCIÓN (días excep.)','UNIDAD OPERACIONAL','ASIGNACIÓN Kg Au','TOTAL BONO (USD)','DÍAS A PAGAR','MONTO A PAGAR','MONTO REDONDEADO','ADSCRIPCIÓN','CUADRILLA','OBSERVACIÓN'];
+  const fechas=['CÁLCULOS INCENTIVO POR PRODUCCIÓN','','',''];
+  const nums=['','','',''];
+  const wds=['N°','CEDULA','NOMBRES Y APELLIDOS','CARGOS'];
+  for(let k=0;k<nd;k++){
+    fechas.push(String(k+1).padStart(2,'0')+'/'+String(mesNum).padStart(2,'0')+'/2026');
+    nums.push(k+1);
+    wds.push(dowN[(dow0+k)%7]);
+  }
+  if(esBono){ colBono.forEach(function(){fechas.push('');nums.push('');}); colBono.forEach(function(h){wds.push(h);}); }
+  const aoa=[fechas,nums,wds];
+  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
+  workers.forEach((w,idx)=>{
+    let arr=null;
+    try{ const r=corridaTrabajador(plant,w.cedula); if(r&&r.arr) arr=r.arr; }catch(e){}
+    if(!arr) return;
+    const tiene=arr.some(c=>c && ['D','N','L','48/96','?'].indexOf(c)<0);
+    if(!tiene) return;
+    const row=arr.map(c=>(c==='?'||c==null)?'':c).slice(0,nd);
+    const base=[idx+1, w.cedula, w.nombre, w.cargo||''].concat(row);
+    if(esBono){
+      const desc=diasDescuento(plant,w.cedula,'q1'); const dp=Math.max(0,30-desc);
+      const monto=(PARAMS[plant].cats[_asigParam(w)]?PARAMS[plant].cats[_asigParam(w)].monto:0);
+      const pagar=Math.round(monto/30*dp*100)/100; const redond=Math.round(monto/30*dp);
+      const incs=INCIDENCIAS.filter(x=>x.plant===plant&&x.cedula===w.cedula);
+      const obs=incs.map(x=>x.code+' '+String(x.desde).slice(8,10)+'/'+String(x.desde).slice(5,7)+' AL '+String(x.hasta).slice(8,10)+'/'+String(x.hasta).slice(5,7)).join(' · ');
+      base.push(desc, unidad[w.asignacion]||'OPERACIONES', w.asignacion||'', monto, dp, pagar, redond, w.adscripcion||'', w.cuadrilla||'', obs);
+    }
+    aoa.push(base);
+  });
+  ROT_MES=prev;
+  return {aoa,nd,extra:esBono?10:0};
+}
+
+function _pago2AOA(titulo, plantN, mesTxt, fp, lista, ipeLabel){
+  const totA=lista.reduce((s,x)=>s+(+x.asistAlim||0),0);
+  const totI=lista.reduce((s,x)=>s+(+x.ipe||0),0);
+  const totT=lista.reduce((s,x)=>s+((+x.asistAlim||0)+(+x.ipe||0)),0);
+  const aoa=[[titulo],[plantN],['MES: '+mesTxt],['FECHA DE PAGO: '+(fp||'')],
+    ['','','','',Math.round(totA*100)/100,Math.round(totI*100)/100,Math.round(totT*100)/100],
+    ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO','INCENTIVO ASISTENCIA',ipeLabel,'TOTAL A PAGAR','FIRMA','FECHA','HUELLA']];
+  lista.forEach((x,i)=>{
+    const asist=Math.round((+x.asistAlim||0)*100)/100, ipe=(+x.ipe||0), tot=Math.round((asist+ipe)*100)/100;
+    aoa.push([i+1, x.ced, x.nombre, x.cargo||'', asist, ipe, tot, '', '', x.ced]);
+  });
+  return aoa;
+}
+function _addSheet2(wb, aoa, name){
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:5},{wch:12},{wch:34},{wch:32},{wch:16},{wch:14},{wch:14},{wch:12},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, name.substring(0,31));
+}
+function _grupoEspAOA(g, plant, plantN, mesTxt, fp){
+  const label=(typeof GRUPO_LABELS!=='undefined'&&GRUPO_LABELS[g])?GRUPO_LABELS[g]:g.toUpperCase();
+  const members=(GRUPOS_FIJOS[g]||[]).filter(x=>!x.plant || x.plant===plant);
+  const tot=members.reduce((s,x)=>s+(+x.monto||0),0);
+  const aoa=[[label.toUpperCase()],[plantN],['MES: '+mesTxt],['FECHA DE PAGO: '+(fp||'')],
+    ['','','','TOTAL',Math.round(tot*100)/100],
+    ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO','MONTO USD','FIRMA','FECHA','HUELLA']];
+  members.forEach((x,i)=>aoa.push([i+1, x.cedula, x.nombre||'', x.cargo||'', Math.round((+x.monto||0)*100)/100, '', '', x.cedula]));
+  return {aoa, n:members.length};
+}
+function exportCaracas(){
+  if(typeof XLSX==='undefined'){toast('No se pudo cargar la librería de Excel (revisa el internet)');return;}
+  const plant=CURRENT_PLANT;
+  if(plant==='ambas'){toast('Selecciona Chocó o Isidora arriba — se exporta una planta a la vez');return;}
+  const plantN=plant==='choco'?'PLANTA CHOCÓ':'MINA ISIDORA';
+  const plantFile=plant==='choco'?'CHOCO':'ISIDORA';
+  const quincena=document.getElementById('calcQuincena').value;
+  const selMP=document.getElementById('calcMesPago'); if(selMP)MES_PAGO=selMP.value;
+  const wb=XLSX.utils.book_new();
+  const mesProd=mesProduccionLabel(), mesPago=mesPagoLabel();
+  const fp=(PARAMS[plant].fechaPago||'');
+
+  // RESUMEN combinado (ambas plantas) — SOLO en el archivo de Chocó. Isidora no lleva resumen.
+  if(plant==='choco'){
+    const cho=memoLineasPlanta('choco',quincena), isi=memoLineasPlanta('isidora',quincena);
+    const perLabel=(quincena==='q1'?'PRIMERA':'SEGUNDA')+' QUINCENA '+mesPago;
+    const resumen=[['CORPORACIÓN VENEZOLANA DE MINERÍA — CVM'],['PARQUE INDUSTRIAL MINERO III CHOCÓ-ISIDORA'],[perLabel],[],
+      ['TRABAJADORES','CONCEPTO','PERÍODO A CANCELAR','MONTO EN DIVISA'],['PLANTA CHOCÓ']];
+    cho.lineas.forEach(l=>resumen.push([l.trab,l.concepto,l.periodo,Math.round((+l.monto||0)*100)/100]));
+    resumen.push([cho.totTrabCobran,'','TOTAL PLANTA CHOCÓ',cho.totMonto]);
+    resumen.push([],['MINA ISIDORA']);
+    isi.lineas.forEach(l=>resumen.push([l.trab,l.concepto,l.periodo,Math.round((+l.monto||0)*100)/100]));
+    resumen.push([isi.totTrabCobran,'','TOTAL MINA ISIDORA',isi.totMonto]);
+    resumen.push([]);
+    resumen.push([cho.totTrabCobran+isi.totTrabCobran,'','TOTAL NÓMINA PIM III CHOCÓ-ISIDORA',Math.round((cho.totMonto+isi.totMonto)*100)/100]);
+    const wsR=XLSX.utils.aoa_to_sheet(resumen); wsR['!cols']=[{wch:14},{wch:40},{wch:28},{wch:16}];
+    XLSX.utils.book_append_sheet(wb, wsR, 'RESUMEN');
+  }
+
+  if(quincena==='q1'){
+    _addSheet(wb, _pagoAOA('INCENTIVO POR PRODUCCIÓN',plantN,mesProd,fp,_listaQ1(plant),'pago','INCENTIVO BONO DE PRODUCCIÓN'),'PAGO');
+  } else {
+    const l=_listaQ2(plant);
+    const ipeLbl='IPE '+mesPago.toUpperCase();
+    const regular=l.filter(x=>(+x.ipe||0)<800), jefes=l.filter(x=>(+x.ipe||0)>=800);
+    _addSheet2(wb, _pago2AOA('INCENTIVO ASISTENCIA Y ALIMENTACIÓN',plantN,mesPago,fp,regular,ipeLbl), 'PAGO '+plantFile);
+    _addSheet2(wb, _pago2AOA('IPE JEFES · ASISTENCIA Y ALIMENTACIÓN',plantN,mesPago,fp,jefes,ipeLbl), 'IPE JEFES');
+    const rows=ARRASTRES.filter(a=>a.plant===plant);
+    const daoa=[['DESCUENTO 16-30 · '+plantN],['MES: '+mesProd],[],['CÉDULA','TRABAJADOR','DÍAS 16-30','Nº DÍAS','DESCUENTO USD']];
+    rows.slice().sort((a,b)=>a.monto-b.monto).forEach(a=>{const ds=diasListArr(a);
+      daoa.push([a.ced,a.nombre||a.ced,ds.map(d=>d+'/06('+a.dias[d]+')').join(' '),ds.length,a.monto]);});
+    daoa.push(['','TOTAL','',rows.length,Math.round(rows.reduce((s,a)=>s+a.monto,0)*100)/100]);
+    const wsD=XLSX.utils.aoa_to_sheet(daoa); wsD['!cols']=[{wch:12},{wch:34},{wch:40},{wch:8},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsD, 'DESCUENTO 16-30');
+  }
+
+  // PAGOS ESPECIALES (según la quincena): q1 = HP/Fundición/Seguridad · q2 = Prueba/Obra
+  const _espSheet={hp:'HP',fundicion:'FUNDICIÓN',seguridad:'CUERPO SEGURIDAD',prueba:'PERÍODO PRUEBA',obra:'OBRA DETERMINADA'};
+  // Fundición y Seguridad: SOLO 1era quincena. HP, Prueba y Obra: ambas quincenas.
+  const _espKeys=(quincena==='q1')?['hp','fundicion','seguridad','prueba','obra']:['hp','prueba','obra'];
+  _espKeys.forEach(function(g){
+    const E=_grupoEspAOA(g, plant, plantN, (quincena==='q1'?mesProd:mesPago), fp);
+    if(E.n>0) _addSheet(wb, E.aoa, _espSheet[g]||g.toUpperCase());
+  });
+
+  // PRODUCCIÓN — corrida día por día (con incidencias encima)
+  let corridaMes=(quincena==='q1') ? ({jul:'jun',ago:'jul',jun:'may',may:'may'}[MES_PAGO]||'jun') : (MES_PAGO||'jul');
+  if(!DIAS_MES[corridaMes]) corridaMes=(quincena==='q1'?'jun':'jul');
+  const C=_corridaAOA(plant,corridaMes);
+  const wsP=XLSX.utils.aoa_to_sheet(C.aoa);
+  const cols=[{wch:5},{wch:12},{wch:32},{wch:28}]; for(let d=0;d<C.nd;d++)cols.push({wch:4}); wsP['!cols']=cols;
+  XLSX.utils.book_append_sheet(wb, wsP, 'PRODUCCIÓN');
+
+  // INCIDENCIAS — 1era quincena: grilla 1-30 filtrada (bono). 2da quincena: grilla 16→fin, todos, con asistencia/IPE.
+  if(quincena==='q1'){
+    const IG=_incidenciasGridAOA(plant, corridaMes, quincena);
+    const wsI=XLSX.utils.aoa_to_sheet(IG.aoa);
+    const icols=[{wch:5},{wch:12},{wch:32},{wch:28}]; for(let d=0;d<IG.nd;d++)icols.push({wch:4}); wsI['!cols']=icols;
+    XLSX.utils.book_append_sheet(wb, wsI, 'INCIDENCIAS');
+  } else {
+    const prevM=({jul:'jun',ago:'jul',jun:'may'})[MES_PAGO]||'jun';
+    const AG=_asistenciaGridAOA(plant, prevM, (MES_PAGO||'jul'));
+    const wsA=XLSX.utils.aoa_to_sheet(AG.aoa);
+    const acols=[{wch:12},{wch:32},{wch:28}]; for(let d=3;d<AG.ncols;d++)acols.push({wch:5}); wsA['!cols']=acols;
+    XLSX.utils.book_append_sheet(wb, wsA, 'INCIDENCIAS');
+  }
+
+  const qn=(quincena==='q1'?'1ra':'2da');
+  XLSX.writeFile(wb, 'Nomina_Caracas_'+plantFile+'_'+qn+'_quincena_'+mesPago.replace(/\s+/g,'_')+'.xlsx');
+  toast('Nómina '+plantN+' exportada para Caracas');
+}
+
 function exportResumen(){
   const R=CALC_RESULT;if(!R)return;
   const quincena=R.quincena;
@@ -3853,9 +4107,11 @@ function exportResumen(){
     {k:'memo_extras',        t:'arr', ref:function(){return MEMO_EXTRAS;}},
     {k:'params',             t:'obj', ref:function(){return PARAMS;}},
     {k:'concepto_names',     t:'obj', ref:function(){return CONCEPTO_NAMES;}},
-    {k:'cierres',            t:'obj', ref:function(){return CIERRES;}}
+    {k:'cierres',            t:'obj', ref:function(){return CIERRES;}},
+    {k:'logo',               t:'scalar', ref:function(){return LOGO_DATA;}, set:function(v){ LOGO_DATA=v; var img=document.getElementById('logoImg'); if(img && v){ img.src=v; img.style.display=''; } }}
   ];
   function applyValue(item, val){
+    if(item.t==='scalar'){ if(item.set) item.set(val); return; }
     if(item.t==='arr'){ var a=item.ref(); a.length=0; (val||[]).forEach(function(x){a.push(x);}); }
     else { var o=item.ref(); Object.keys(o).forEach(function(kk){delete o[kk];}); Object.assign(o, val||{}); }
   }
