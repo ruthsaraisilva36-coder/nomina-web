@@ -3769,19 +3769,39 @@ function addRetroactivo(){
   renderRetroList();
 }
 function delRetro(id){RETROACTIVOS=RETROACTIVOS.filter(r=>r.id!==id);if(CALC_RESULT)runCalculo();renderRetroList();toast('Retroactivo eliminado');}
+let _retroListExpanded=false;
+function toggleRetroList(){
+  _retroListExpanded=!_retroListExpanded;
+  renderRetroList();
+}
 function renderRetroList(){
   const box=document.getElementById('retroList');if(!box)return;
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
   const rows=RETROACTIVOS.filter(r=>r.plant===plant);
   if(!rows.length){box.innerHTML='<span style="color:var(--muted);font-size:12.5px">Sin retroactivos cargados.</span>';return;}
-  box.innerHTML='<table class="memo-table" style="margin:0"><thead><tr><th>Trabajador</th><th>Quincena</th><th>Monto</th><th>Motivo</th><th></th></tr></thead><tbody>'+
+  const totalMonto=rows.reduce((s,r)=>s+(+r.monto||0),0);
+  const motivos=[...new Set(rows.map(r=>r.motivo||'').filter(Boolean))];
+  const motivoTxt=motivos.length?motivos.join(', '):'—';
+  const toggleIcon=_retroListExpanded?'▼':'▶';
+  const toggleLabel=_retroListExpanded?'Ocultar detalle':'Ver detalle';
+  const tableDisplay=_retroListExpanded?'':'display:none';
+  box.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <span style="font-size:13px;font-weight:600">${rows.length} retroactivos <span style="color:var(--muted);font-weight:400">&middot;</span> <span style="color:var(--ok);font-weight:700">$${fmt2(totalMonto)}</span> <span style="color:var(--muted);font-weight:400">total</span></span>
+      <button class="btn btn-ghost btn-sm" onclick="toggleRetroList()" style="font-size:12px">${toggleIcon} ${toggleLabel}</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Motivo: ${motivoTxt}</div>
+  </div>
+  <div id="retroListTable" style="${tableDisplay}">
+    <table class="memo-table" style="margin:0"><thead><tr><th>Trabajador</th><th>Quincena</th><th>Monto</th><th>Motivo</th><th></th></tr></thead><tbody>`+
     rows.map(r=>`<tr>
       <td><b>${r.nombre||r.ced}</b><br><small style="color:var(--muted)">C.I. ${r.ced}</small></td>
       <td>${r.quincena==='q1'?'1era':'2da'}</td>
       <td class="money" style="color:${r.monto>=0?'var(--ok)':'var(--bad)'}">${r.monto>=0?'+':''}${fmt2(r.monto)}</td>
       <td style="font-size:12px;color:var(--muted)">${r.motivo||''}</td>
       <td><button class="icon-btn danger" onclick="delRetro(${r.id})" title="Quitar">✕</button></td>
-    </tr>`).join('')+'</tbody></table>';
+    </tr>`).join('')+`</tbody></table>
+  </div>`;
 }
 
 /* ---- Descuento 16-30 (arrastre del mes anterior) ----
@@ -4500,7 +4520,7 @@ function renderConceptos(){
     const isQ2=c.tipo==='q2';
     const head=isQ2
       ? `<tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Días pag.</th><th>Asistencia</th><th>Alimentación</th><th>IPE</th><th>Retro.</th><th>Desc.16-30</th><th>Total</th><th>Firma</th></tr>`
-      : `<tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Categoría</th><th>Base</th><th>Desc.</th><th>Días pag.</th><th>Retro.</th><th>Monto</th><th>Firma</th></tr>`;
+      : `<tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Categoría</th><th>Base</th><th>Desc.</th><th>Días pag.</th><th>Retro.</th><th>Total</th><th>Firma</th></tr>`;
     const rows=c.lista.slice(0,700).map((x,i)=>isQ2
       ? `<tr><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${x.diasPagados}</td>
           <td class="money">${fmt2(x.asist)}</td><td class="money">${fmt2(x.alim)}</td>
@@ -4512,10 +4532,17 @@ function renderConceptos(){
           <td class="money">${fmt(x.base)}</td><td>${x.desc||0}</td><td>${x.diasPagados}</td>
           <td class="money" style="color:${x.retro>0?'var(--ok)':x.retro<0?'var(--bad)':'var(--muted)'}">${x.retro?(x.retro>0?'+':'')+fmt2(x.retro):'—'}</td>
           <td class="money"><b>$${fmt(x.pago)}</b></td><td style="width:80px"></td></tr>`).join('');
+    const totBase=c.tipo==='produccion'?c.lista.reduce((s,x)=>s+(+x.pagoBase||0),0):0;
+    const totRetro=c.tipo==='produccion'?c.lista.reduce((s,x)=>s+(+x.retro||0),0):0;
+    const totLine=c.tipo==='produccion'
+      ? `<span style="font-size:12.5px;font-weight:400">Bono Base: <b>$${fmt(totBase)}</b></span>`
+        +(totRetro>0?` <span style="color:var(--muted);font-size:12px">|</span> <span style="font-size:12.5px;font-weight:400;color:var(--ok)">Retroactivo: <b>+$${fmt(totRetro)}</b></span>`:'')
+        +` <span style="color:var(--muted);font-size:12px">|</span> <span style="font-size:13px;font-weight:700">Total: $${fmt(c.tot)}</span>`
+      : `<span class="ctot">$${fmt(c.tot)}</span>`;
     return `<div class="concept-card">
       <div class="concept-head">
         <span class="cname">${name}</span>
-        <span class="ctot">$${fmt(c.tot)}</span>
+        ${totLine}
         <div class="cert-actions">
           <button class="btn btn-ghost btn-sm" onclick="printListado('${name.replace(/'/g,"")}')">🖨 Imprimir listado</button>
           <button class="btn btn-ghost btn-sm" onclick="exportListado('${name.replace(/'/g,"")}')">⇩ Excel</button>
@@ -4786,8 +4813,10 @@ function _listaQ1(plant){
   workers.forEach(w=>{
     const monto=(PARAMS[plant].cats[_asigParam(w)]?PARAMS[plant].cats[_asigParam(w)].monto:0);
     const desc=diasDescuento(plant,w.cedula,'q1'); const dp=Math.max(0,30-desc);
-    const pago=Math.round(monto/30*dp)+retroDe(plant,w.cedula,'q1');
-    if(pago>0) out.push({ced:w.cedula,nombre:w.nombre,cargo:w.cargo||'',pago:Math.round(pago*100)/100});
+    const pagoBase=Math.round(monto/30*dp);
+    const retro=retroDe(plant,w.cedula,'q1');
+    const pago=Math.round((pagoBase+retro)*100)/100;
+    if(pago>0) out.push({ced:w.cedula,nombre:w.nombre,cargo:w.cargo||'',pagoBase,retro,pago});
   });
   return out;
 }
@@ -4817,6 +4846,23 @@ function _pagoAOA(titulo, plantN, mesTxt, fechaPago, lista, montoKey, montoLabel
 function _addSheet(wb, aoa, name){
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:5},{wch:12},{wch:34},{wch:32},{wch:14},{wch:12},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, name.substring(0,31));
+}
+function _pagoQ1AOA(titulo, plantN, mesTxt, fechaPago, lista){
+  const totBase=lista.reduce((s,x)=>s+(+x.pagoBase||0),0);
+  const totRetro=lista.reduce((s,x)=>s+(+x.retro||0),0);
+  const totPago=lista.reduce((s,x)=>s+(+x.pago||0),0);
+  const aoa=[[titulo],[plantN],['MES: '+mesTxt],['FECHA DE PAGO: '+(fechaPago||'')],
+    ['','','','TOTAL',Math.round(totBase*100)/100,Math.round(totRetro*100)/100,Math.round(totPago*100)/100],
+    ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO','BONO BASE','RETROACTIVO','TOTAL','FIRMA','FECHA','HUELLA']];
+  lista.forEach((x,i)=>aoa.push([i+1, parseInt(x.ced,10)||x.ced, x.nombre, x.cargo,
+    Math.round((+x.pagoBase||0)*100)/100, Math.round((+x.retro||0)*100)/100, Math.round((+x.pago||0)*100)/100,
+    '', '', parseInt(x.ced,10)||x.ced]));
+  return aoa;
+}
+function _addSheetQ1(wb, aoa, name){
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:5},{wch:12},{wch:34},{wch:32},{wch:14},{wch:14},{wch:14},{wch:12},{wch:10},{wch:12}];
   XLSX.utils.book_append_sheet(wb, ws, name.substring(0,31));
 }
 
@@ -4972,7 +5018,7 @@ function exportCaracas(){
   }
 
   if(quincena==='q1'){
-    _addSheet(wb, _pagoAOA('INCENTIVO POR PRODUCCIÓN',plantN,mesProd,fp,_listaQ1(plant),'pago','INCENTIVO BONO DE PRODUCCIÓN'),'PAGO');
+    _addSheetQ1(wb, _pagoQ1AOA('INCENTIVO POR PRODUCCIÓN',plantN,mesProd,fp,_listaQ1(plant)),'PAGO');
   } else {
     const l=_listaQ2(plant);
     const ipeLbl='IPE '+mesPago.toUpperCase();
