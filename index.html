@@ -1242,13 +1242,29 @@ function rotPill(r){
 function renderDash(){
   const nCho=DATA_PERSONAL.choco.filter(w=>w.estado==='activo').length;
   const nIsi=DATA_PERSONAL.isidora.filter(w=>w.estado==='activo').length;
-  const resu=RESUMEN_OFICIAL.filter(r=>CURRENT_PLANT==='ambas'?true:r.planta===CURRENT_PLANT);
-  const totMonto=resu.reduce((s,r)=>s+r.monto,0);
-  const totTrab=resu.reduce((s,r)=>s+(r.yaEnBono?0:r.trab),0);
+  // Leer quincena del selector de cálculo (si existe), por defecto q1
+  const qSel=document.getElementById('calcQuincena');
+  const quincena=qSel?qSel.value:'q1';
+  const qLabel=quincena==='q1'?'1era quincena':'2da quincena';
+
+  // Calcular composición DINÁMICA desde memoLineasPlanta()
+  const resu=[];
+  const plantas=CURRENT_PLANT==='ambas'?['choco','isidora']:[CURRENT_PLANT];
+  let grandTotalMonto=0, grandTotalTrab=0;
+  plantas.forEach(pl=>{
+    const m=memoLineasPlanta(pl,quincena);
+    const plantLabel=pl==='choco'?'Chocó':'Isidora';
+    m.lineas.forEach(l=>{
+      resu.push({grupo:l.concepto,planta:pl,plantLabel,trab:l.trab||0,monto:l.monto||0,
+        noContarTrab:!!l.noContarTrab,manual:!!l.manual});
+    });
+    grandTotalMonto+=m.totMonto;
+    grandTotalTrab+=m.totTrabCobran;
+  });
 
   const kpis=[
-    {cls:'k-money',lab:'Total a cancelar',val:'$'+fmt(totMonto),sub:'1era quincena julio 2026'},
-    {cls:'',lab:'Trabajadores (memo)',val:fmt(totTrab),sub:CURRENT_PLANT==='ambas'?'Chocó + Isidora':('Planta '+(CURRENT_PLANT==='choco'?'Chocó':'Isidora'))},
+    {cls:'k-money',lab:'Total a cancelar',val:'$'+fmt(grandTotalMonto),sub:qLabel+' '+mesPagoLabel().toLowerCase()},
+    {cls:'',lab:'Trabajadores (memo)',val:fmt(grandTotalTrab),sub:CURRENT_PLANT==='ambas'?'Chocó + Isidora':('Planta '+(CURRENT_PLANT==='choco'?'Chocó':'Isidora'))},
     {cls:'k-choco',lab:'Personal Chocó',val:fmt(nCho),sub:'en base maestra'},
     {cls:'k-isidora',lab:'Personal Isidora',val:fmt(nIsi),sub:'en base maestra'},
   ];
@@ -1257,15 +1273,19 @@ function renderDash(){
       <div class="lab">${k.lab}</div><div class="val">${k.val}</div><div class="sub">${k.sub}</div>
     </div>`).join('');
 
+  // Actualizar título de la sección
+  const secTitle=document.querySelector('#view-dash .section-title');
+  if(secTitle) secTitle.textContent='Composición de la nómina · '+qLabel;
+
   const tb=document.querySelector('#tblGrupos tbody');
-  tb.innerHTML=resu.map(r=>`<tr${r.yaEnBono?' style="color:var(--muted)"':''}>
-      <td><b>${r.grupo}</b>${r.yaEnBono?' <small>(trab. ya en Producción)</small>':''}</td>
-      <td>${r.planta==='choco'?'Chocó':'Isidora'}</td>
+  tb.innerHTML=resu.map(r=>`<tr${r.noContarTrab?' style="color:var(--muted)"':''}>
+      <td><b>${r.grupo}</b>${r.noContarTrab?' <small>(trab. ya en Producción)</small>':''}${r.manual?' <small style="color:var(--ok)">(extra)</small>':''}</td>
+      <td>${r.plantLabel}</td>
       <td>${fmt(r.trab)}</td>
-      <td style="color:var(--muted);font-size:12.5px">${r.tipo}</td>
+      <td style="color:var(--muted);font-size:12.5px">${r.manual?'Manual (extra)':'Motor / memo'}</td>
       <td class="money">$${fmt(r.monto)}</td>
     </tr>`).join('')+`<tr style="background:var(--paper-2);font-weight:800">
-      <td>TOTAL</td><td></td><td>${fmt(totTrab)}</td><td></td><td class="money">$${fmt(totMonto)}</td></tr>`;
+      <td>TOTAL</td><td></td><td>${fmt(grandTotalTrab)}</td><td></td><td class="money">$${fmt(grandTotalMonto)}</td></tr>`;
 }
 
 /* ---------- PERSONAL ---------- */
@@ -4150,14 +4170,28 @@ function exportDescuento1630(){
   a.download='Descuento_16-30_junio_'+plant+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
   toast('Descuento 16-30 exportado ('+rows.length+' trabajadores)');
 }
+let _arrastreListExpanded=false;
+function toggleArrastreList(){
+  _arrastreListExpanded=!_arrastreListExpanded;
+  renderArrastreList();
+}
 function renderArrastreList(){
   const box=document.getElementById('arrastreList');if(!box)return;
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
   const rows=ARRASTRES.filter(a=>a.plant===plant);
   if(!rows.length){box.innerHTML='<span style="color:var(--muted);font-size:12.5px">Sin descuentos 16-30 cargados. Importa la hoja PRODUCCIÓN de la 1era quincena.</span>';return;}
   const totMonto=rows.reduce((s,a)=>s+a.monto,0);
-  box.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px">${rows.length} trabajadores · total <b style="color:var(--bad)">${fmt2(totMonto)}</b> USD</div>`+
-    '<table class="memo-table" style="margin:0"><thead><tr><th>Trabajador</th><th>Días 16-30 junio (código)</th><th>Nº</th><th>Monto</th><th></th></tr></thead><tbody>'+
+  const toggleIcon=_arrastreListExpanded?'▼':'▶';
+  const toggleLabel=_arrastreListExpanded?'Ocultar detalle':'Ver detalle';
+  const tableDisplay=_arrastreListExpanded?'':'display:none';
+  box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:600;color:var(--bad)">${rows.length} descuentos</span>
+      <span style="color:var(--muted);font-size:12px">·</span>
+      <span style="font-size:13px">Total: <b style="color:var(--bad)">${fmt2(totMonto)}</b> USD</span>
+      <button class="btn btn-ghost btn-sm" onclick="toggleArrastreList()" style="font-size:12px">${toggleIcon} ${toggleLabel}</button>
+    </div>
+    <div style="${tableDisplay};margin-top:8px">
+    <table class="memo-table" style="margin:0"><thead><tr><th>Trabajador</th><th>Días 16-30 junio (código)</th><th>Nº</th><th>Monto</th><th></th></tr></thead><tbody>`+
     rows.map(a=>{
       const ds=diasListArr(a);
       return `<tr>
@@ -4166,7 +4200,7 @@ function renderArrastreList(){
       <td style="text-align:center">${ds.length}</td>
       <td class="money" style="color:var(--bad)">${fmt2(a.monto)}</td>
       <td><button class="icon-btn danger" onclick="delArrastre(${a.id})" title="Quitar">✕</button></td>
-    </tr>`;}).join('')+'</tbody></table>';
+    </tr>`;}).join('')+'</tbody></table></div>';
 }
 
 function initCalc(){
