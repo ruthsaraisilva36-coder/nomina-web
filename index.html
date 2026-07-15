@@ -1084,9 +1084,9 @@ const USERS = {
 // Parámetros del memo por defecto (memo JUNIO 2026, mismos para ambas plantas de origen)
 const DEFAULT_PARAMS = {
   choco:   {kilos:126663.27, fechaPago:'2026-07-15', mes:'JUNIO 2026',
-            cats:{ADM:{valor:2,monto:255},CONEXO:{valor:2.5,monto:320},OPERATIVO:{valor:3,monto:380},SUBTERRANEA:{valor:3.5,monto:443}}},
+            cats:{ADM:{valor:3,monto:255},CONEXO:{valor:3.5,monto:320},OPERATIVO:{valor:4,monto:380}}},
   isidora: {kilos:126663.27, fechaPago:'2026-07-15', mes:'JUNIO 2026',
-            cats:{ADM:{valor:2,monto:255},CONEXO:{valor:2.5,monto:320},OPERATIVO:{valor:3,monto:380},SUBTERRANEA:{valor:3.5,monto:443}}},
+            cats:{ADM:{valor:3,monto:255},CONEXO:{valor:3.5,monto:320},OPERATIVO:{valor:4,monto:380}}},
 };
 
 // Resumen oficial 1era quincena (del memo RESUMEN GESTION HUMANA)
@@ -1504,13 +1504,13 @@ function renderParams(){
       <div class="cat-tag">Pago: ${p.fechaPago}</div>
     </div>`;
 
-  const cats=[['ADM','ADM · 2$'],['CONEXO','CONEXO · 2.5$'],['OPERATIVO','OPERATIVO · 3$'],['SUBTERRANEA','OP. SUBTERRÁNEA · 3.5$']];
-  document.getElementById('paramCats').innerHTML=cats.map(([k,lab])=>`
+  const cats=[['ADM','ADM · 3$',3],['CONEXO','CONEXO · 3.5$',3.5],['OPERATIVO','OPERATIVO · 4$',4]];
+  document.getElementById('paramCats').innerHTML=cats.map(([k,lab,val])=>`
     <div class="param-cell">
       <label>${lab.split('·')[0]}</label>
       <div class="valline"><span style="font-size:16px;color:var(--muted)">$</span>
-        <input data-cat="${k}" type="number" value="${p.cats[k].monto}" ${readonly?'disabled':''}></div>
-      <div class="cat-tag">Valor ${p.cats[k].valor}$/Kg · monto redondeado por gerencia</div>
+        <input data-cat="${k}" type="number" value="${p.cats[k]?p.cats[k].monto:0}" ${readonly?'disabled':''}></div>
+      <div class="cat-tag">Valor ${val}$/Kg · monto redondeado por gerencia</div>
     </div>`).join('');
 
   if(CURRENT_PLANT==='ambas'){
@@ -3204,7 +3204,7 @@ function diasDescuento(plant,ced,quincena){
   const mesNum=quincena==='q1'?mesAnterior:mesActual;
   const cedN=normCed(ced);
   // códigos que descuentan por quincena
-  const descQ1=['V','PNR','A','X','S'];
+  const descQ1=['PNR','A','X','S']; // V (vacaciones) no descuenta del bono
   const descQ2=['R','V','A','PNR','S','X'];
   const setDesc=quincena==='q1'?descQ1:descQ2;
   const diasSet=new Set();
@@ -3233,7 +3233,7 @@ function diasParaIPE(plant,ced){
   const mesActual=MES_NUM[MES_PAGO]||7;
   const mesNum=mesActual;  // IPE siempre del mes actual (2da quincena)
   const cedN=normCed(ced);
-  const cuentan=['R','V','PNR','PR','S','A','X'];
+  const cuentan=['R','PNR','PR','S','A','X']; // V (vacaciones) no afecta IPE
   const diasSet=new Set();
   INCIDENCIAS.filter(i=>i.plant===plant&&normCed(i.cedula)===cedN&&cuentan.includes(i.code)).forEach(inc=>{
     const d0=_pd(inc.desde),d1=_pd(inc.hasta);
@@ -3265,7 +3265,7 @@ function runCalculo(){
     // Bono de Producción — usa PARÁMETROS DEL MEMO según la asignación individual del trabajador
     const lista=[];
     // mapeo asignación → clave de parámetro
-    const asigToParam={2:'ADM', 2.5:'CONEXO', 3:'OPERATIVO', 3.5:'SUBTERRANEA'};
+    const asigToParam={2:'ADM', 2.5:'CONEXO', 3:'OPERATIVO'};
     workers.forEach(w=>{
       // La asignación del trabajador (2, 2.5, 3, 3.5) determina qué parámetro del memo usar
       const asig=w.asignacion||0;
@@ -3616,7 +3616,7 @@ function memoLineasPlanta(plant,quincena){
     workers.forEach(w=>{
       // Base por ASIGNACIÓN (2/2.5/3/3.5), igual que el detalle de ⚡Calcular.
       // El campo 'categoria' viene inconsistente en la data para muchos trabajadores.
-      const cat=({2:'ADM',2.5:'CONEXO',3:'OPERATIVO',3.5:'SUBTERRANEA'})[w.asignacion]||'OPERATIVO';
+      const cat=({2:'ADM',2.5:'CONEXO',3:'OPERATIVO'})[w.asignacion]||'OPERATIVO';
       const monto=(PARAMS[plant].cats[cat]?PARAMS[plant].cats[cat].monto:0);
       const desc=diasDescuento(plant,w.cedula,'q1');
       const pago=Math.round(monto/30*Math.max(0,30-desc))+retroDe(plant,w.cedula,'q1');
@@ -3808,7 +3808,7 @@ function exportListado(name){
   toast('Listado exportado');
 }
 /* ===================== EXPORTAR PARA CARACAS (Excel .xlsx) ===================== */
-function _asigParam(w){ return ({2:'ADM',2.5:'CONEXO',3:'OPERATIVO',3.5:'SUBTERRANEA'})[w.asignacion]||'OPERATIVO'; }
+function _asigParam(w){ return ({2:'ADM',2.5:'CONEXO',3:'OPERATIVO'})[w.asignacion]||'OPERATIVO'; }
 
 function _listaQ1(plant){
   const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
@@ -3841,7 +3841,7 @@ function _pagoAOA(titulo, plantN, mesTxt, fechaPago, lista, montoKey, montoLabel
   const tot=lista.reduce((s,x)=>s+(+x[montoKey]||0),0);
   const aoa=[[titulo],[plantN],['MES: '+mesTxt],['FECHA DE PAGO: '+(fechaPago||'')],['','','','TOTAL',Math.round(tot*100)/100],
     ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO',montoLabel,'FIRMA','FECHA','HUELLA']];
-  lista.forEach((x,i)=>aoa.push([i+1, x.ced, x.nombre, x.cargo, Math.round((+x[montoKey]||0)*100)/100, '', '', x.ced]));
+    lista.forEach((x,i)=>aoa.push([i+1, parseInt(x.ced,10)||x.ced, x.nombre, x.cargo, Math.round((+x[montoKey]||0)*100)/100, '', '', parseInt(x.ced,10)||x.ced]));
   return aoa;
 }
 function _addSheet(wb, aoa, name){
@@ -3862,7 +3862,7 @@ function _corridaAOA(plant, mesKey){
   workers.forEach((w,i)=>{
     let arr=new Array(nd).fill('');
     try{ const r=corridaTrabajador(plant,w.cedula); if(r&&r.arr) arr=r.arr.map(c=>(c==='?'||c==null)?'':c); }catch(e){}
-    aoa.push([i+1, w.cedula, w.nombre, w.cargo||''].concat(arr.slice(0,nd)));
+    aoa.push([i+1, parseInt(w.cedula,10)||w.cedula, w.nombre, w.cargo||''].concat(arr.slice(0,nd)));
   });
   ROT_MES=prev;
   return {aoa,nd};
@@ -3898,7 +3898,7 @@ function _asistenciaGridAOA(plant, prevMes, curMes){
     const diasIPE=diasParaIPE(plant,w.cedula); const ipe=diasIPE>=16?0:(w.ipe||0);
     const incs=INCIDENCIAS.filter(x=>x.plant===plant&&x.cedula===w.cedula);
     const obs=incs.map(x=>x.code+' '+String(x.desde).slice(8,10)+'/'+String(x.desde).slice(5,7)+'-'+String(x.hasta).slice(8,10)+'/'+String(x.hasta).slice(5,7)).join(' · ');
-    aoa.push([w.cedula, w.nombre, w.cargo||''].concat(dias).concat([dp, asistAlim, ipe, w.adscripcion||'', w.cuadrilla||'', obs]));
+    aoa.push([parseInt(w.cedula,10)||w.cedula, w.nombre, w.cargo||''].concat(dias).concat([dp, asistAlim, ipe, w.adscripcion||'', w.cuadrilla||'', obs]));
   });
   return {aoa, ncols:3+dd.length+endH.length};
 }
@@ -3929,7 +3929,7 @@ function _incidenciasGridAOA(plant, mesKey, quincena){
     const tiene=arr.some(c=>c && ['D','N','L','48/96','?'].indexOf(c)<0);
     if(!tiene) return;
     const row=arr.map(c=>(c==='?'||c==null)?'':c).slice(0,nd);
-    const base=[idx+1, w.cedula, w.nombre, w.cargo||''].concat(row);
+    const base=[idx+1, parseInt(w.cedula,10)||w.cedula, w.nombre, w.cargo||''].concat(row);
     if(esBono){
       const desc=diasDescuento(plant,w.cedula,'q1'); const dp=Math.max(0,30-desc);
       const monto=(PARAMS[plant].cats[_asigParam(w)]?PARAMS[plant].cats[_asigParam(w)].monto:0);
@@ -3953,7 +3953,7 @@ function _pago2AOA(titulo, plantN, mesTxt, fp, lista, ipeLabel){
     ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO','INCENTIVO ASISTENCIA',ipeLabel,'TOTAL A PAGAR','FIRMA','FECHA','HUELLA']];
   lista.forEach((x,i)=>{
     const asist=Math.round((+x.asistAlim||0)*100)/100, ipe=(+x.ipe||0), tot=Math.round((asist+ipe)*100)/100;
-    aoa.push([i+1, x.ced, x.nombre, x.cargo||'', asist, ipe, tot, '', '', x.ced]);
+    aoa.push([i+1, parseInt(x.ced,10)||x.ced, x.nombre, x.cargo||'', asist, ipe, tot, '', '', parseInt(x.ced,10)||x.ced]);
   });
   return aoa;
 }
@@ -3969,7 +3969,7 @@ function _grupoEspAOA(g, plant, plantN, mesTxt, fp){
   const aoa=[[label.toUpperCase()],[plantN],['MES: '+mesTxt],['FECHA DE PAGO: '+(fp||'')],
     ['','','','TOTAL',Math.round(tot*100)/100],
     ['N°','CEDULA','APELLIDOS Y NOMBRES','CARGO','MONTO USD','FIRMA','FECHA','HUELLA']];
-  members.forEach((x,i)=>aoa.push([i+1, x.cedula, x.nombre||'', x.cargo||'', Math.round((+x.monto||0)*100)/100, '', '', x.cedula]));
+  members.forEach((x,i)=>aoa.push([i+1, parseInt(x.cedula,10)||x.cedula, x.nombre||'', x.cargo||'', Math.round((+x.monto||0)*100)/100, '', '', parseInt(x.cedula,10)||x.cedula]));
   return {aoa, n:members.length};
 }
 function exportCaracas(){
@@ -4012,7 +4012,7 @@ function exportCaracas(){
     const rows=ARRASTRES.filter(a=>a.plant===plant);
     const daoa=[['DESCUENTO 16-30 · '+plantN],['MES: '+mesProd],[],['CÉDULA','TRABAJADOR','DÍAS 16-30','Nº DÍAS','DESCUENTO USD']];
     rows.slice().sort((a,b)=>a.monto-b.monto).forEach(a=>{const ds=diasListArr(a);
-      daoa.push([a.ced,a.nombre||a.ced,ds.map(d=>d+'/06('+a.dias[d]+')').join(' '),ds.length,a.monto]);});
+      daoa.push([parseInt(a.ced,10)||a.ced,a.nombre||a.ced,ds.map(d=>d+'/06('+a.dias[d]+')').join(' '),ds.length,a.monto]);});
     daoa.push(['','TOTAL','',rows.length,Math.round(rows.reduce((s,a)=>s+a.monto,0)*100)/100]);
     const wsD=XLSX.utils.aoa_to_sheet(daoa); wsD['!cols']=[{wch:12},{wch:34},{wch:40},{wch:8},{wch:14}];
     XLSX.utils.book_append_sheet(wb, wsD, 'DESCUENTO 16-30');
