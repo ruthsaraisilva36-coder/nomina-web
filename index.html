@@ -3655,7 +3655,8 @@ function memoLineasPlanta(plant,quincena){
     lineas.push({extraId:e.id,concepto:e.concepto,trab:e.trab,periodo:e.periodo,monto:e.monto,manual:true});
   });
   const totMonto=lineas.reduce((s,l)=>s+(+l.monto||0),0);
-  return {lineas,totMonto:Math.round(totMonto*100)/100,totTrabCobran:cobran.size};
+  const totTrabCobran=lineas.filter(l=>!l.noContarTrab&&!l.manual).reduce((s,l)=>s+(+l.trab||0),0);
+  return {lineas,totMonto:Math.round(totMonto*100)/100,totTrabCobran};
 }
 
 function renderMemoResumen(){
