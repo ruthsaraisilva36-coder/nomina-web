@@ -2865,49 +2865,143 @@ function itemsDeGerencia(ger){
 }
 function printGerencia(ger){
   const items=itemsDeGerencia(ger);
-  const plant=CURRENT_PLANT==='isidora'?'Mina Isidora':'Planta Chocó';
-  const rows=items.map((it,i)=>`<tr>
-    <td>${i+1}</td><td>${it.ced}</td><td>${it.nombre||''}</td><td>${it.cargo||''}</td>
-    <td style="text-align:center;font-weight:700">${it.code}</td>
-    <td>${it.dias.join(', ')}</td>
-    <td style="text-align:center">${it.descuenta?'Sí':'No'}</td>
-    <td style="width:120px"></td>
-  </tr>`).join('');
-  document.getElementById('printArea').innerHTML=`
-    <div style="font-family:Arial,sans-serif;padding:24px;color:#000">
-      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:6px">
-        <div style="font-size:13px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
-        <div style="font-size:12px">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
-      </div>
-      <h3 style="text-align:center;margin:14px 0 4px;font-size:14px">REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN</h3>
-      <p style="text-align:center;font-size:12px;margin:0 0 14px">${plant} · ${mesLabel()} · ${CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'}</p>
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead><tr style="background:#eee">
-          <th style="border:1px solid #999;padding:5px">#</th><th style="border:1px solid #999;padding:5px">Cédula</th>
-          <th style="border:1px solid #999;padding:5px">Nombre y Apellido</th><th style="border:1px solid #999;padding:5px">Cargo</th>
-          <th style="border:1px solid #999;padding:5px">Código</th><th style="border:1px solid #999;padding:5px">Días</th>
-          <th style="border:1px solid #999;padding:5px">¿Descuenta?</th><th style="border:1px solid #999;padding:5px">Certifica (firma)</th>
+  const plantKey=CURRENT_PLANT==='isidora'?'isidora':'choco';
+  const plantN=plantKey==='choco'?'PLANTA CHOCÓ':'MINA ISIDORA';
+  const nd=DIAS_MES[ROT_MES]||31;
+  const dias=Array.from({length:nd},(_,i)=>i+1);
+  const headerImg=typeof HEADER_CVM!=='undefined'?HEADER_CVM:null;
+  const footerImg=typeof FOOTER_CVM!=='undefined'?FOOTER_CVM:null;
+
+  const thStyle='border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;background:#e8e8e8';
+  const tdStyle='border:1px solid #ccc;padding:2px 1px;font-size:7.5px;text-align:center';
+  const tdNameStyle='border:1px solid #ccc;padding:2px 3px;font-size:7.5px;text-align:left;white-space:nowrap';
+
+  // Header de días
+  const diasTH=dias.map(d=>`<th style="${thStyle};width:18px;min-width:18px">${d}</th>`).join('');
+
+  const rows=items.map((it,i)=>{
+    const w=findWorker(plantKey,it.ced);
+    const adsc=w?(w.adscripcion||'—'):'—';
+    const cuad=w?(w.cuadrilla||''):'';
+    const r=corridaTrabajador(plantKey,it.ced);
+    const corrida=r?r.arr:new Array(nd).fill('?');
+    const diasCells=corrida.slice(0,nd).map((c,idx)=>{
+      const dia=idx+1;
+      const isExc=it.dias.includes(dia);
+      const bg=isExc?'#FECACA':'';
+      const fw=isExc?'700':'400';
+      const val=isExc?it.code:c;
+      return `<td style="${tdStyle};background:${bg};font-weight:${fw}">${val}</td>`;
+    }).join('');
+    return `<tr>
+      <td style="${tdStyle}">${i+1}</td>
+      <td style="${tdStyle}">${it.ced}</td>
+      <td style="${tdNameStyle}">${it.nombre||''}</td>
+      <td style="${tdNameStyle}">${it.cargo||''}</td>
+      <td style="${tdNameStyle};font-size:7px">${adsc}</td>
+      <td style="${tdStyle}">${cuad}</td>
+      <td style="${tdStyle};font-weight:700">${it.code}</td>
+      <td style="${tdStyle}">${it.descuenta?'Sí':'No'}</td>
+      ${diasCells}
+      <td style="${tdStyle};font-weight:700">${it.dias.length}</td>
+      <td style="${tdStyle};width:70px"></td>
+    </tr>`;
+  }).join('');
+
+  const clone=document.createElement('div');
+  clone.innerHTML=`
+    <div style="font-family:Arial,sans-serif;padding:10px;color:#000">
+      ${headerImg?`<div style="margin-bottom:8px"><img src="${headerImg}" style="width:100%"></div>`:`
+        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
+          <div style="font-size:11px">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
+        </div>`}
+      <h3 style="text-align:center;margin:8px 0 2px;font-size:12px">REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN — CON CORRIDA DE ROTACIÓN</h3>
+      <p style="text-align:center;font-size:10px;margin:0 0 8px">${plantN} · ${mesLabel()} · Gerencia: ${ger}<br>${CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'}</p>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="${thStyle}">#</th>
+          <th style="${thStyle}">Cédula</th>
+          <th style="${thStyle}">Nombre y Apellido</th>
+          <th style="${thStyle}">Cargo</th>
+          <th style="${thStyle}">Adscripción</th>
+          <th style="${thStyle}">Cuadr.</th>
+          <th style="${thStyle}">Cód.</th>
+          <th style="${thStyle}">Desc.</th>
+          ${diasTH}
+          <th style="${thStyle}">Total</th>
+          <th style="${thStyle}">Certifica</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="margin-top:20px;font-size:12px"><b>Gerencia / Coordinación:</b> ${ger}</div>
-      <div style="margin-top:50px;display:flex;justify-content:space-around;font-size:12px">
-        <div style="text-align:center;border-top:1px solid #000;padding-top:6px;width:220px">Certificado por (Gerencia)</div>
-        <div style="text-align:center;border-top:1px solid #000;padding-top:6px;width:220px">Coordinación de Gestión Humana</div>
+      <div style="margin-top:14px;font-size:10px"><b>Total trabajadores:</b> ${items.length} · <b>Total días excepción:</b> ${items.reduce((s,it)=>s+it.dias.length,0)}</div>
+      <div style="margin-top:40px;display:flex;justify-content:space-around;font-size:10px">
+        <div style="text-align:center;border-top:1px solid #000;padding-top:5px;width:200px">Certificado por (Gerencia)</div>
+        <div style="text-align:center;border-top:1px solid #000;padding-top:5px;width:200px">Coordinación de Gestión Humana</div>
       </div>
+      ${footerImg?`<div style="margin-top:16px"><img src="${footerImg}" style="width:100%"></div>`:''}
     </div>`;
+
+  // Aplicar estilos inline para impresión confiable
+  clone.querySelectorAll('th').forEach(th=>{th.style.background='#e8e8e8';});
+
+  const pa=document.getElementById('printArea');
+  pa.innerHTML='';pa.appendChild(clone);
+  pa.style.display='block';
   window.print();
+  pa.style.display='none';
 }
 function exportGerencia(ger){
   const items=itemsDeGerencia(ger);
-  let csv='N,CEDULA,NOMBRE,CARGO,CODIGO,SIGNIFICADO,DIAS,DESCUENTA,CERTIFICACION\n';
-  items.forEach((it,i)=>{
+  if(!items.length){toast('No hay items para exportar');return;}
+  if(typeof XLSX==='undefined'){toast('No se pudo cargar la librería de Excel');return;}
+  const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
+  const nd=DIAS_MES[ROT_MES]||31;
+  const dias=Array.from({length:nd},(_,i)=>i+1);
+  const plantN=plant==='choco'?'PLANTA CHOCÓ':'MINA ISIDORA';
+  const mesN=mesNombre(ROT_MES)||'';
+
+  const aoa=[
+    ['REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN — CON CORRIDA DE ROTACIÓN'],
+    [plantN+' · '+mesN+' · Gerencia: '+ger],
+    [CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'],
+    [],
+    ['N°','CÉDULA','APELLIDOS Y NOMBRES','CARGO','UNIDAD DE ADSCRIPCIÓN','GRUPO/CUADRILLA','CÓDIGO','SIGNIFICADO','¿DESCUENTA?'].concat(dias).concat(['TOTAL DÍAS','CERTIFICA'])
+  ];
+
+  items.forEach((it,idx)=>{
+    const w=findWorker(plant,it.ced);
+    const adsc=w?(w.adscripcion||'SIN ADSCRIPCIÓN'):'SIN ADSCRIPCIÓN';
+    const cuad=w?(w.cuadrilla||''):'';
     const sig=CODES[it.code]?CODES[it.code].label:it.code;
-    csv+=[i+1,it.ced,`"${it.nombre||''}"`,`"${it.cargo||''}"`,it.code,`"${sig}"`,
-      `"${it.dias.join(' ')}"`,it.descuenta?'Si':'No',''].join(',')+'\n';
+    const r=corridaTrabajador(plant,it.ced);
+    const corrida=r?r.arr:new Array(nd).fill('?');
+    // Marcar los días de excepción con el código sobre la corrida
+    const fila=corrida.slice(0,nd).map((c,i)=>{
+      const dia=i+1;
+      if(it.dias.includes(dia)) return it.code;
+      return c;
+    });
+    aoa.push([idx+1, parseInt(it.ced,10)||it.ced, it.nombre||'', it.cargo||'', adsc, cuad, it.code, sig, it.descuenta?'Sí':'No'].concat(fila).concat([it.dias.length,'']));
   });
-  downloadCSV(csv,'Certificacion_'+ger.replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)+'_'+mesLabel().replace(' ','_')+'.csv');
-  toast('Reporte de '+ger+' exportado');
+
+  // Fila total
+  const totalDias=items.reduce((s,it)=>s+it.dias.length,0);
+  aoa.push([]);
+  aoa.push(['','','','','','','','','TOTAL TRABAJADORES: '+items.length].concat(new Array(nd).fill('')).concat([totalDias,'']));
+
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  const cols=[{wch:5},{wch:12},{wch:34},{wch:22},{wch:28},{wch:18},{wch:8},{wch:24},{wch:12}];
+  for(let i=0;i<nd;i++) cols.push({wch:5});
+  cols.push({wch:10},{wch:14});
+  ws['!cols']=cols;
+  const gerClean=ger.replace(/[^a-zA-Z0-9]/g,'_').slice(0,25);
+  XLSX.utils.book_append_sheet(wb,ws,'CERT '+gerClean.slice(0,26));
+
+  const fname='Certificacion_'+gerClean+'_'+mesN.replace(/\s+/g,'_')+'.xlsx';
+  XLSX.writeFile(wb,fname);
+  toast('Excel exportado: '+fname);
 }
 
 /* ============================================================
