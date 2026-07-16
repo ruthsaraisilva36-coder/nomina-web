@@ -411,9 +411,15 @@
   .cert-just-code{padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:12px;font-family:inherit;display:none}
   .cert-just-code.show{display:inline-block}
   @media print{
-    body *{visibility:hidden}
-    #printArea,#printArea *{visibility:visible}
-    #printArea{position:absolute;left:0;top:0;width:100%;padding:20px}
+    body *{visibility:hidden !important}
+    #printArea,#printArea *{visibility:visible !important}
+    #printArea{position:absolute;left:0;top:0;width:100%;padding:14px;font-family:Arial,sans-serif;color:#000}
+    #printArea .memo-preview{box-shadow:none !important;border:none !important;max-width:100%;padding:0}
+    #printArea .memo-table{font-size:11px}
+    #printArea .memo-table th,#printArea .memo-table td{border:1px solid #999;padding:5px 8px}
+    #printArea .memo-table th{background:#eee !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #printArea .memo-table tr.tot td{background:#333 !important;color:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #printArea .memo-sign{page-break-inside:avoid}
     .no-print{display:none !important}
   }
   #printArea{display:none}
@@ -497,11 +503,7 @@
   .cert-just-code{padding:5px 8px;border:1px solid var(--line);border-radius:7px;font-size:12px;font-family:inherit;font-weight:700;display:none}
   .cert-just-code.show{display:inline-block}
   .cert-actions{display:flex;gap:8px}
-  @media print{
-    body *{visibility:hidden}
-    #printArea,#printArea *{visibility:visible}
-    #printArea{position:absolute;left:0;top:0;width:100%}
-  }
+  /* print rules consolidated above */
   #printArea{display:none}
 
   /* ---- consulta trabajador ---- */
@@ -4803,9 +4805,9 @@ function renderMemoResumen(){
   const logo=LOGO_DATA?`<img src="${LOGO_DATA}" class="mp-logo">`:'<div class="mp-logo-ph no-print-ph">LOGO CVM<br><small>(botón "Cargar logo")</small></div>';
   document.getElementById('calcResumen').innerHTML=`
     <div class="memo-preview" id="memoPreview">
-      <div class="mp-head">
-        ${logo}
-        <h3>CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</h3>
+      <div class="mp-head" style="position:relative;text-align:center">
+        <div style="position:absolute;right:0;top:0">${logo}</div>
+        <h3 style="margin-top:8px">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</h3>
         <div class="mp-sub">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
       </div>
       <p style="text-align:right;font-size:12.5px;margin:6px 0 12px">${fechaMemo}</p>
@@ -4899,8 +4901,21 @@ function printListado(name){
 function printMemoResumen(){
   const clone=document.getElementById('memoPreview').cloneNode(true);
   clone.querySelectorAll('.no-print').forEach(el=>el.remove());
-  document.getElementById('printArea').innerHTML='<div style="font-family:Arial,sans-serif;padding:20px">'+clone.outerHTML+'</div>';
+  // Asegurar que la tabla de totales tenga estilos inline para impresión
+  clone.querySelectorAll('tr.tot td').forEach(td=>{
+    td.style.background='#333';td.style.color='#fff';td.style.fontWeight='800';
+  });
+  clone.querySelectorAll('.memo-table th').forEach(th=>{
+    th.style.background='#eee';th.style.border='1px solid #999';th.style.padding='5px 8px';
+  });
+  clone.querySelectorAll('.memo-table td').forEach(td=>{
+    if(!td.style.background)td.style.border='1px solid #999';td.style.padding='5px 8px';
+  });
+  const pa=document.getElementById('printArea');
+  pa.innerHTML='';pa.appendChild(clone);
+  pa.style.display='block';
   window.print();
+  pa.style.display='none';
 }
 function exportListado(name){
   const R=CALC_RESULT;const c=R.conceptos[name];if(!c)return;
