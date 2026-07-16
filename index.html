@@ -5456,6 +5456,7 @@ function exportResumen(){
     {k:'params',             t:'obj', ref:function(){return PARAMS;}},
     {k:'concepto_names',     t:'obj', ref:function(){return CONCEPTO_NAMES;}},
     {k:'cierres',            t:'obj', ref:function(){return CIERRES;}},
+    {k:'cruce_result',       t:'scalar', ref:function(){return CRUCE_RESULT;}, set:function(v){ CRUCE_RESULT=v; }},
     {k:'logo',               t:'scalar', ref:function(){return LOGO_DATA;}, set:function(v){ LOGO_DATA=v; var img=document.getElementById('logoImg'); if(img && v){ img.src=v; img.style.display=''; } }}
   ];
   function applyValue(item, val){
