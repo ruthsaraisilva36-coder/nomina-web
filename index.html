@@ -1295,7 +1295,7 @@ function renderDash(){
 
   const tb=document.querySelector('#tblGrupos tbody');
   tb.innerHTML=resu.map(r=>`<tr${r.noContarTrab?' style="color:var(--muted)"':''}>
-      <td><b>${r.grupo}</b>${r.noContarTrab?' <small>(trab. ya en Producción)</small>':''}${r.manual?' <small style="color:var(--ok)">(extra)</small>':''}</td>
+      <td><b>${r.grupo}</b>${r.noContarTrab?' <small>(trab. ya incluidos)</small>':''}${r.manual?' <small style="color:var(--ok)">(extra)</small>':''}</td>
       <td>${r.plantLabel}</td>
       <td>${fmt(r.trab)}</td>
       <td style="color:var(--muted);font-size:12.5px">${r.manual?'Manual (extra)':'Motor / memo'}</td>
@@ -2752,7 +2752,7 @@ function buildCertItems(){
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
   const prev={};
   CERT_ITEMS.forEach(it=>prev[it.id]=it); // preservar estados ya marcados
-  const items=[];
+  const raw=[];
   const mesNum=ROT_MES==='jun'?6:7;
 
   // 1) ausencias del cruce (si se ejecutó y es de esta planta)
@@ -2762,25 +2762,58 @@ function buildCertItems(){
     Object.entries(byW).forEach(([ced,dias])=>{
       const w=findWorker(plant,ced);if(!w)return;
       const id='A_'+plant+'_'+ced;
-      items.push(mergePrev(prev,{id,plant,ced,nombre:w.nombre,cargo:w.cargo,ger:gerenciaDe(w),
+      raw.push(mergePrev(prev,{id,plant,ced,nombre:w.nombre,cargo:w.cargo,ger:gerenciaDe(w),
         code:'A',dias:dias.sort((a,b)=>a-b),descuenta:true,status:'pend',justCode:'',nota:''}));
     });
   }
-  // 2) incidencias cargadas de esta planta (por sus fechas reales, sin depender de ROT_MES)
+  // 2) incidencias cargadas de esta planta — solo días del mes actual (ROT_MES)
+  const _mesActual=MES_NUM[ROT_MES]||7;
   INCIDENCIAS.filter(i=>i.plant===plant).forEach(inc=>{
     const w=findWorker(plant,inc.cedula);if(!w)return;
-    // días que cubre la incidencia (todos los de su rango en 2026)
     const dias=[];
     const d0=_pd(inc.desde),d1=_pd(inc.hasta);
     for(let dt=new Date(d0);dt<=d1;dt.setDate(dt.getDate()+1)){
-      if(dt.getFullYear()===2026)dias.push(dt.getDate());
+      if(dt.getFullYear()===2026 && (dt.getMonth()+1)===_mesActual) dias.push(dt.getDate());
     }
     if(!dias.length)return;
     const id='I_'+inc.id;
-    items.push(mergePrev(prev,{id,plant,ced:inc.cedula,nombre:w.nombre,cargo:w.cargo,ger:gerenciaDe(w),
-      code:inc.code,dias,desde:inc.desde,hasta:inc.hasta,descuenta:CODES[inc.code].desc,
+    raw.push(mergePrev(prev,{id,plant,ced:inc.cedula,nombre:w.nombre,cargo:w.cargo,ger:gerenciaDe(w),
+      code:inc.code,dias,desde:inc.desde,hasta:inc.hasta,descuenta:CODES[inc.code]?CODES[inc.code].desc:true,
       status:'pend',justCode:'',nota:inc.nota||''}));
   });
+
+  // 3) Consolidar: si el mismo trabajador tiene una ausencia 'A' del cruce Y una incidencia
+  //    con código específico para los mismos días, la incidencia prevalece (es más precisa).
+  //    Si tiene códigos diferentes, se mantienen ambas líneas.
+  const consolidated=[];
+  const byKey={};  // clave: ced + code
+  raw.forEach(it=>{
+    const k=it.ced+'_'+it.code;
+    if(byKey[k]){
+      // mismo trabajador, mismo código → unificar días sin duplicar
+      const existing=byKey[k];
+      const allDias=[...new Set([...existing.dias,...it.dias])].sort((a,b)=>a-b);
+      existing.dias=allDias;
+    } else {
+      byKey[k]=it;
+      consolidated.push(it);
+    }
+  });
+
+  // Si un trabajador tiene ausencia 'A' Y también una incidencia con código específico
+  // para los mismos días exactos, quitar esos días de la 'A' (la incidencia lo explica)
+  const incByCed={};
+  consolidated.filter(it=>it.code!=='A').forEach(it=>{
+    (incByCed[it.ced]=incByCed[it.ced]||[]).push(...it.dias);
+  });
+  const items=consolidated.filter(it=>{
+    if(it.code==='A' && incByCed[it.ced]){
+      it.dias=it.dias.filter(d=>!incByCed[it.ced].includes(d));
+      if(!it.dias.length) return false; // todos los días de 'A' ya están explicados por incidencias
+    }
+    return true;
+  });
+
   CERT_ITEMS=items;
 }
 function mergePrev(prev,item){
@@ -2890,15 +2923,14 @@ function _buildCertPage(ger){
   const headerImg=typeof HEADER_CVM!=='undefined'?HEADER_CVM:null;
   const footerImg=typeof FOOTER_CVM!=='undefined'?FOOTER_CVM:null;
 
-  const thS='border:1px solid #888;padding:4px 3px;font-size:9.5px;text-align:center;background:#e0e0e0;-webkit-print-color-adjust:exact;print-color-adjust:exact';
-  const tdS='border:1px solid #bbb;padding:3px 2px;font-size:9px;text-align:center';
-  const tdN='border:1px solid #bbb;padding:3px 4px;font-size:9px;text-align:left;white-space:nowrap';
+  const thS='border:1px solid #888;padding:4px 3px;font-size:10px;text-align:center;background:#e0e0e0;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+  const tdS='border:1px solid #bbb;padding:3px 2px;font-size:10px;text-align:center';
+  const tdN='border:1px solid #bbb;padding:3px 4px;font-size:10px;text-align:left;white-space:nowrap';
 
-  const diasTH=dias.map(d=>`<th style="${thS};width:20px;min-width:20px">${d}</th>`).join('');
+  const diasTH=dias.map(d=>`<th style="${thS};width:22px;min-width:22px;padding:3px 1px">${d}</th>`).join('');
 
   const rows=items.map((it,i)=>{
     const w=findWorker(plantKey,it.ced);
-    const adsc=w?(w.adscripcion||'—'):'—';
     const cuad=w?(w.cuadrilla||''):'';
     const r=corridaTrabajador(plantKey,it.ced);
     const corrida=r?r.arr:new Array(nd).fill('?');
@@ -2908,20 +2940,18 @@ function _buildCertPage(ger){
       const bg=isExc?'#FECACA':'';
       const fw=isExc?'700':'400';
       const val=isExc?it.code:c;
-      return `<td style="${tdS};background:${bg};font-weight:${fw};-webkit-print-color-adjust:exact;print-color-adjust:exact">${val}</td>`;
+      return `<td style="${tdS};background:${bg};font-weight:${fw};padding:3px 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${val}</td>`;
     }).join('');
     return `<tr>
       <td style="${tdS}">${i+1}</td>
       <td style="${tdS}">${it.ced}</td>
       <td style="${tdN}">${it.nombre||''}</td>
-      <td style="${tdN}">${it.cargo||''}</td>
-      <td style="${tdN};font-size:8.5px">${adsc}</td>
       <td style="${tdS}">${cuad}</td>
       <td style="${tdS};font-weight:700">${it.code}</td>
       <td style="${tdS}">${it.descuenta?'Sí':'No'}</td>
       ${diasCells}
       <td style="${tdS};font-weight:700">${it.dias.length}</td>
-      <td style="${tdS};width:80px"></td>
+      <td style="${tdS};width:90px"></td>
     </tr>`;
   }).join('');
 
@@ -2929,29 +2959,27 @@ function _buildCertPage(ger){
     <div style="font-family:Arial,sans-serif;padding:12px;color:#000">
       ${headerImg?`<div style="margin-bottom:10px"><img src="${headerImg}" style="width:100%"></div>`:`
         <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:6px">
-          <div style="font-size:14px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
+          <div style="font-size:15px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
           <div style="font-size:12px">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
         </div>`}
-      <h3 style="text-align:center;margin:10px 0 3px;font-size:14px">REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN — CON CORRIDA DE ROTACIÓN</h3>
-      <p style="text-align:center;font-size:11px;margin:0 0 10px">${plantN} · ${mesLabel()} · Gerencia: ${ger}<br>${CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'}</p>
-      <table style="width:100%;border-collapse:collapse">
+      <h3 style="text-align:center;margin:10px 0 3px;font-size:14px">REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN</h3>
+      <p style="text-align:center;font-size:12px;margin:0 0 10px">${plantN} · ${mesLabel()} · <b>${ger}</b><br>${CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'}</p>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed">
         <thead><tr>
-          <th style="${thS}">#</th>
-          <th style="${thS}">Cédula</th>
-          <th style="${thS}">Nombre y Apellido</th>
-          <th style="${thS}">Cargo</th>
-          <th style="${thS}">Adscripción</th>
-          <th style="${thS}">Cuadr.</th>
-          <th style="${thS}">Cód.</th>
-          <th style="${thS}">Desc.</th>
+          <th style="${thS};width:28px">#</th>
+          <th style="${thS};width:72px">Cédula</th>
+          <th style="${thS};width:auto">Nombre y Apellido</th>
+          <th style="${thS};width:46px">Grupo</th>
+          <th style="${thS};width:34px">Cód.</th>
+          <th style="${thS};width:34px">Desc.</th>
           ${diasTH}
-          <th style="${thS}">Total</th>
-          <th style="${thS}">Certifica</th>
+          <th style="${thS};width:34px">Total</th>
+          <th style="${thS};width:80px">Certifica</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="margin-top:14px;font-size:11px"><b>Total trabajadores:</b> ${items.length} · <b>Total días excepción:</b> ${items.reduce((s,it)=>s+it.dias.length,0)}</div>
-      <div style="margin-top:40px;display:flex;justify-content:space-around;font-size:11px">
+      <div style="margin-top:14px;font-size:12px"><b>Total trabajadores:</b> ${items.length} · <b>Total días excepción:</b> ${items.reduce((s,it)=>s+it.dias.length,0)}</div>
+      <div style="margin-top:40px;display:flex;justify-content:space-around;font-size:12px">
         <div style="text-align:center;border-top:1px solid #000;padding-top:6px;width:220px">Certificado por (Gerencia)</div>
         <div style="text-align:center;border-top:1px solid #000;padding-top:6px;width:220px">Coordinación de Gestión Humana</div>
       </div>
@@ -4938,7 +4966,7 @@ function memoLineasPlanta(plant,quincena){
     });
     // Asistencia+Alimentación con el descuento 16-30 ya incluido en el total
     lineas.push({key:'q2_asist',concepto:CONCEPTO_NAMES.q2_asist,trab:nAsist,periodo:periodoBase,monto:Math.round((totAsist+totDesc)*100)/100});
-    lineas.push({key:'q2_ipe',concepto:CONCEPTO_NAMES.q2_ipe,trab:nIpe,periodo:periodoBase,monto:Math.round(totIpe*100)/100});
+    lineas.push({key:'q2_ipe',concepto:CONCEPTO_NAMES.q2_ipe,trab:nIpe,periodo:periodoBase,monto:Math.round(totIpe*100)/100,noContarTrab:true});
   }
   MEMO_EXTRAS.filter(e=>e.plant===plant&&e.quincena===quincena).forEach(e=>{
     lineas.push({extraId:e.id,concepto:e.concepto,trab:e.trab,periodo:e.periodo,monto:e.monto,manual:true});
@@ -4967,7 +4995,7 @@ function renderMemoResumen(){
       : (l.key?`<button class="icon-btn" onclick="editConceptoName('${l.key}')" title="Renombrar concepto">✎</button>`:'');
     return `<tr>
       <td style="text-align:center">${fmt(l.trab)}</td>
-      <td>${l.concepto}${l.noContarTrab?' <small style="color:var(--muted)">(trab. ya en producción)</small>':''}</td>
+      <td>${l.concepto}${l.noContarTrab?' <small style="color:var(--muted)">(trab. ya incluidos)</small>':''}</td>
       <td style="text-align:center;font-size:12px">${l.periodo}</td>
       <td class="money"${l.esDescuento||l.monto<0?' style="color:var(--bad)"':''}>$${fmt2(l.monto)}</td>
       <td class="no-print" style="white-space:nowrap">${edit}</td>
