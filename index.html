@@ -924,11 +924,11 @@
       <!-- DESCUENTO 16-30 -->
       <section class="view" id="view-descuento1630">
         <div class="info-note"><span class="ic">➖</span>
-          <div>Personal con <b>descuento 16–30 de junio</b> para la 2da quincena (asistencia+alimentación no trabajadas en la 2da mitad de junio, a $3,33/día). Se calcula de las incidencias de junio ya cargadas y <b>respeta los autorizados por gerencia</b>. Puedes filtrar y exportar a Excel.</div>
+          <div id="desc1630Info">Personal con <b>descuento 16–30 del mes anterior</b> para la 2da quincena (asistencia+alimentación no trabajadas, a $3,33/día). Se calcula de las incidencias del mes anterior ya cargadas y <b>respeta los autorizados por gerencia</b>. Puedes filtrar y exportar a Excel.</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
           <input id="desc1630Search" type="text" placeholder="Buscar por cédula o nombre…" style="flex:1;min-width:220px;margin:0;padding:9px 12px" oninput="renderDescuento1630()">
-          <button class="btn btn-au btn-sm" style="width:auto" onclick="recalcular1630()">⟳ Recalcular desde junio</button>
+          <button class="btn btn-au btn-sm" style="width:auto" onclick="recalcular1630()" id="btn1630Recalc">⟳ Recalcular</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="addArrastre()">+ Manual</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="clearArrastres()">Limpiar</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="exportDescuento1630()">⇩ Exportar Excel</button>
@@ -964,7 +964,7 @@
           <button class="btn btn-au" style="width:auto" onclick="runCalculo()">⚡ Calcular nómina</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="exportCaracas()">⬇ Exportar para Caracas (planta seleccionada)</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="addRetroactivo()">⇅ Cargar retroactivo</button>
-          <button class="btn btn-au btn-sm" style="width:auto" onclick="recalcular1630()">⟳ Calcular descuento 16-30 (junio)</button>
+          <button class="btn btn-au btn-sm" style="width:auto" onclick="recalcular1630()" id="btn1630RecalcCalc">⟳ Calcular descuento 16-30</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="document.getElementById('arrFile').click()">⇊ Importar descuento 16-30</button>
           <input type="file" id="arrFile" accept=".xlsx,.xls" style="display:none" onchange="importArrastreProduccion(this.files);this.value=''">
           <span class="count" id="calcInfo" style="margin-left:auto"></span>
@@ -1186,7 +1186,7 @@ function applyRole(){
 
 /* ---------- NAV ---------- */
 const TITLES={dash:'Panel general',personal:'Personal',params:'Parámetros del período',
-  incidencias:'Incidencias',biometrico:'Cruce biométrico',certificacion:'Certificación',descuento1630:'Descuento 16-30 (junio)',reportes:'Cálculo y reportes'};
+  incidencias:'Incidencias',biometrico:'Cruce biométrico',certificacion:'Certificación',descuento1630:'Descuento 16-30',reportes:'Cálculo y reportes'};
 function go(view){
   document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===view));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -2254,21 +2254,25 @@ function rcShow(plant,ced){
   card.classList.add('show');
 }
 
-/* Panel: corte 16-30 de junio con los días que descuentan (importados de la 1era
-   quincena). Se muestra dentro de la corrida de JULIO como referencia del descuento. */
+/* Panel: corte 16-30 del mes anterior con los días que descuentan (importados de la 1era
+   quincena). Se muestra dentro de la corrida como referencia del descuento. */
 function corte1630JunHTML(plant,ced){
   const w=findWorker(plant,ced); if(!w)return '';
   const rec=ARRASTRES.find(a=>a.plant===plant&&a.ced===String(ced).replace(/\D/g,''));
+  const mesAnt=mesAnteriorDesc1630();
+  const mesKey=mesAnt.key;
+  const maxDia=DIAS_MES[mesKey]||30;
+  const mesNumStr=String(mesAnt.num).padStart(2,'0');
   const base=(ROTACIONES[plant]||{})[w.cuadrilla];
-  const baseJun=base?base.jun:null;
-  const diasDesc=rec?rec.dias:{};   // {16:'R',19:'A',...}
+  const baseMes=base?base[mesKey]:null;
+  const diasDesc=rec?rec.dias:{};
   const colCode={R:'#B26A00',A:'#B3261E',V:'#B3261E',PNR:'#B3261E',S:'#B3261E',X:'#B3261E'};
   let celdas='';
-  for(let d=16; d<=30; d++){
-    const dow=(mesDOW('jun')+(d-1))%7, wk=(dow===0||dow===6);
+  for(let d=16; d<=maxDia; d++){
+    const dow=(mesDOW(mesKey)+(d-1))%7, wk=(dow===0||dow===6);
     const code=diasDesc[d];
     let bg='#ECECEC',col='#5a6672',txt='·',borde='';
-    if(baseJun){ const b=baseJun[d-1];
+    if(baseMes){ const b=baseMes[d-1];
       if(b==='D'){bg='#E7EEF6';col='#1C2530';txt='D';}
       else if(b==='N'){bg='#38485a';col='#fff';txt='N';}
       else if(b==='L'){bg='#ECECEC';col='#5a6672';txt='L';}
@@ -2282,12 +2286,12 @@ function corte1630JunHTML(plant,ced){
   return `
     <div style="margin-top:18px;padding-top:14px;border-top:2px dashed var(--line)">
       <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
-        Corte 16-30 junio · descuento que se arrastra a esta 2da quincena
+        Corte 16-${maxDia} ${mesAnt.nombre.toLowerCase()} · descuento que se arrastra a esta 2da quincena
       </div>
       <div class="rc-days">${celdas}</div>
       ${lista.length
-        ? `<div class="ipe-change show" style="margin-top:10px">Días que descuentan: <b>${lista.map(d=>d+'/06('+diasDesc[d]+')').join(', ')}</b> · ${lista.length} día(s) × $${fmt2(VALOR_DIA_1630)} = <b style="color:var(--bad)">${fmt2(monto)}</b></div>`
-        : (rec?'':`<div style="margin-top:10px;font-size:12.5px;color:var(--muted)">Sin descuento 16-30 importado para este trabajador. Importa la hoja PRODUCCIÓN en la pestaña de cálculo.</div>`)}
+        ? `<div class="ipe-change show" style="margin-top:10px">Días que descuentan: <b>${lista.map(d=>d+'/'+mesNumStr+'('+diasDesc[d]+')').join(', ')}</b> · ${lista.length} día(s) × $${fmt2(VALOR_DIA_1630)} = <b style="color:var(--bad)">${fmt2(monto)}</b></div>`
+        : (rec?'':`<div style="margin-top:10px;font-size:12.5px;color:var(--muted)">Sin descuento 16-${maxDia} importado para este trabajador. Importa la hoja PRODUCCIÓN en la pestaña de cálculo.</div>`)}
     </div>`;
 }
 
@@ -4134,18 +4138,26 @@ function excluidoDeQ2(ced){
   const cedN=normCed(ced);
   return ['fundicion','seguridad'].some(g=>(GRUPOS_FIJOS[g]||[]).some(x=>normCed(x.cedula)===cedN));
 }
-/* Calcula el descuento 16-30 de JUNIO directamente desde las incidencias de junio
-   ya cargadas (códigos que descuentan, excluyendo los autorizados por gerencia). */
+/* Calcula el descuento 16-30 del MES ANTERIOR a ROT_MES directamente desde las
+   incidencias ya cargadas (códigos que descuentan, excluyendo autorizados por gerencia).
+   Ej: ROT_MES='jul' → descuenta incidencias del 16-30 de junio.
+       ROT_MES='ago' → descuenta incidencias del 16-30 de julio. */
+function mesAnteriorDesc1630(){
+  const prev=mesPrev(ROT_MES);
+  if(!prev) return {key:'jun',num:6,nombre:'Junio'};
+  return {key:prev, num:MES_NUM[prev]||6, nombre:mesNombre(prev).replace(/ 2026/,'')};
+}
 function calcularDescuento1630(plant){
-  ARRASTRES=ARRASTRES.filter(a=>a.plant!==plant); // reemplaza los de esta planta
+  ARRASTRES=ARRASTRES.filter(a=>a.plant!==plant);
+  const mesAnt=mesAnteriorDesc1630();
   const byW={};
   INCIDENCIAS.filter(i=>i.plant===plant && CODES_DESC_1630.includes(i.code) && !i.autorizado && !excluidoDeQ2(i.cedula)).forEach(inc=>{
     const cedN=normCed(inc.cedula);
     const d0=_pd(inc.desde),d1=_pd(inc.hasta);
     for(let dt=new Date(d0);dt<=d1;dt.setDate(dt.getDate()+1)){
-      if(dt.getFullYear()===2026 && (dt.getMonth()+1)===6){
+      if(dt.getFullYear()===2026 && (dt.getMonth()+1)===mesAnt.num){
         const day=dt.getDate();
-        if(day>=16 && day<=30){ (byW[cedN]=byW[cedN]||{})[day]=inc.code; }
+        if(day>=16 && day<=31){ (byW[cedN]=byW[cedN]||{})[day]=inc.code; }
       }
     }
   });
@@ -4153,7 +4165,7 @@ function calcularDescuento1630(plant){
     const w=DATA_PERSONAL[plant].find(x=>normCed(x.cedula)===cedN);
     const nDias=Object.keys(dias).length;
     ARRASTRES.push({id:ARRASTRE_ID++,plant,ced:w?w.cedula:cedN,nombre:w?w.nombre:cedN,dias,
-      monto:montoArrastre(nDias),mesOrigen:'junio (16-30)',
+      monto:montoArrastre(nDias),mesOrigen:mesAnt.nombre+' (16-'+DIAS_MES[mesAnt.key]+')',
       quien:(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)?CURRENT_USER.name:'sistema',
       cuando:(typeof nowStamp==='function')?nowStamp():''});
   });
@@ -4161,10 +4173,11 @@ function calcularDescuento1630(plant){
 }
 function recalcular1630(){
   if(CURRENT_PLANT==='ambas'){toast('Selecciona Chocó o Isidora');return;}
+  const mesAnt=mesAnteriorDesc1630();
   const n=calcularDescuento1630(CURRENT_PLANT);
   if(typeof renderArrastreList==='function')renderArrastreList();
   if(CALC_RESULT)runCalculo();
-  toast('Descuento 16-30 (junio) calculado desde incidencias: '+n+' trabajadores');
+  toast('Descuento 16-30 ('+mesAnt.nombre+') calculado desde incidencias: '+n+' trabajadores');
 }
 
 /* Importa la hoja PRODUCCION de la nómina de 1era quincena y extrae, por
@@ -4359,7 +4372,7 @@ function importArrastreProduccion(fileList){
         const w=findWorker(plant,ced);
         const monto=montoArrastre(nd);
         ARRASTRES.push({id:ARRASTRE_ID++,plant,ced,nombre:w?w.nombre:(String(row[cedCol+1]||'').trim()),
-          dias,monto,mesOrigen:'junio',quien:CURRENT_USER.name,cuando:nowStamp()});
+          dias,monto,mesOrigen:mesAnteriorDesc1630().nombre,quien:CURRENT_USER.name,cuando:nowStamp()});
         nTrab++; nDiasTot+=nd;
       }
       toast(`Descuento 16-30 importado · ${nTrab} trabajadores · ${nDiasTot} días`);
@@ -4376,7 +4389,9 @@ function addArrastre(){
   const ced=prompt('Cédula del trabajador:');if(!ced)return;
   const cedL=ced.replace(/\D/g,'');
   const w=findWorker(plant,cedL);
-  const entrada=prompt('Días ausentes del 16 al 30 de junio con su código, ej: 16=R,17=R,19=A\n(o solo los días 16,17,19 y se asume A):','');
+  const mesAnt=mesAnteriorDesc1630();
+  const maxDia=DIAS_MES[mesAnt.key]||30;
+  const entrada=prompt('Días ausentes del 16 al '+maxDia+' de '+mesAnt.nombre.toLowerCase()+' con su código, ej: 16=R,17=R,19=A\n(o solo los días 16,17,19 y se asume A):','');
   if(entrada===null)return;
   const dias={};
   entrada.split(',').forEach(par=>{
@@ -4385,16 +4400,16 @@ function addArrastre(){
     if(p.includes('=')){[d,code]=p.split('=');}
     else{d=p;code='A';}
     d=parseInt(String(d).trim(),10); code=String(code).trim().toUpperCase();
-    if(d>=16&&d<=30&&CODES_DESC_1630.includes(code))dias[d]=code;
+    if(d>=16&&d<=maxDia&&CODES_DESC_1630.includes(code))dias[d]=code;
   });
   const nd=Object.keys(dias).length;
-  if(!nd){toast('No se cargó ningún día válido (16-30, código que descuenta)');return;}
+  if(!nd){toast('No se cargó ningún día válido (16-'+maxDia+', código que descuenta)');return;}
   const monto=montoArrastre(nd);
   ARRASTRES=ARRASTRES.filter(a=>!(a.plant===plant&&a.ced===cedL));
-  ARRASTRES.push({id:ARRASTRE_ID++,plant,ced:cedL,nombre:w?w.nombre:cedL,dias,monto,mesOrigen:'junio',
+  ARRASTRES.push({id:ARRASTRE_ID++,plant,ced:cedL,nombre:w?w.nombre:cedL,dias,monto,mesOrigen:mesAnt.nombre,
     quien:CURRENT_USER.name,cuando:nowStamp()});
-  if(w&&w.hist)logMove(w,'Descuento 16-30',`${Object.entries(dias).map(([d,c])=>d+'-jun('+c+')').join(', ')} · ${nd} día(s) · ${fmt2(monto)} USD`);
-  toast('Descuento 16-30 cargado · '+nd+' día(s) · '+fmt2(monto));
+  if(w&&w.hist)logMove(w,'Descuento 16-30',`${Object.entries(dias).map(([d,c])=>d+'-'+mesAnt.nombre.toLowerCase().slice(0,3)+'('+c+')').join(', ')} · ${nd} día(s) · ${fmt2(monto)} USD`);
+  toast('Descuento 16-30 ('+mesAnt.nombre+') cargado · '+nd+' día(s) · '+fmt2(monto));
   if(CALC_RESULT)runCalculo();
   renderArrastreList();if(typeof renderDescuento1630==='function')renderDescuento1630();
 }
@@ -4412,12 +4427,24 @@ function diasListArr(a){return Object.keys(a.dias||{}).map(d=>+d).sort((x,y)=>x-
 function renderDescuento1630(){
   const cont=document.getElementById('desc1630List'); if(!cont)return;
   const res=document.getElementById('desc1630Resumen');
+  const mesAnt=mesAnteriorDesc1630();
+  const mesNumStr=String(mesAnt.num).padStart(2,'0');
+
+  // Actualizar textos dinámicos
+  const infoEl=document.getElementById('desc1630Info');
+  if(infoEl) infoEl.innerHTML=`Personal con <b>descuento 16–${DIAS_MES[mesAnt.key]||30} de ${mesAnt.nombre.toLowerCase()}</b> para la 2da quincena (asistencia+alimentación no trabajadas en la 2da mitad de ${mesAnt.nombre.toLowerCase()}, a $3,33/día). Se calcula de las incidencias de ${mesAnt.nombre.toLowerCase()} ya cargadas y <b>respeta los autorizados por gerencia</b>. Puedes filtrar y exportar a Excel.`;
+  const btnRec=document.getElementById('btn1630Recalc');
+  if(btnRec) btnRec.textContent='⟳ Recalcular desde '+mesAnt.nombre.toLowerCase();
+  // Título de la vista
+  const titleEl=document.getElementById('viewTitle');
+  if(titleEl && titleEl.textContent.includes('Descuento')) titleEl.textContent='Descuento 16-30 ('+mesAnt.nombre.toLowerCase()+')';
+
   if(CURRENT_PLANT==='ambas'){
     cont.innerHTML='<div class="info-note"><span class="ic">⚠</span><div>El descuento se maneja por planta. Cambia arriba a <b>Chocó</b> o <b>Isidora</b>.</div></div>';
     if(res)res.textContent=''; return;
   }
   const plant=CURRENT_PLANT;
-  if(!ARRASTRES.some(a=>a.plant===plant)) calcularDescuento1630(plant); // deriva si no hay
+  if(!ARRASTRES.some(a=>a.plant===plant)) calcularDescuento1630(plant);
   const q=(document.getElementById('desc1630Search').value||'').toLowerCase().trim();
   const all=ARRASTRES.filter(a=>a.plant===plant);
   const totMonto=all.reduce((s,a)=>s+a.monto,0);
@@ -4425,16 +4452,16 @@ function renderDescuento1630(){
   if(q) rows=all.filter(a=>((a.nombre||'')+' '+a.ced).toLowerCase().includes(q));
   if(res)res.innerHTML=`${all.length} trabajadores · total <b style="color:var(--bad)">${fmt2(totMonto)}</b> USD`;
   if(!rows.length){
-    cont.innerHTML='<div class="bio-empty"><div class="big">✓</div><h3 style="color:var(--slate)">Sin descuentos</h3><p>No hay personal con descuento 16–30 en esta planta'+(q?' que coincida con el filtro':'')+'.</p></div>';
+    cont.innerHTML='<div class="bio-empty"><div class="big">✓</div><h3 style="color:var(--slate)">Sin descuentos</h3><p>No hay personal con descuento 16–'+(DIAS_MES[mesAnt.key]||30)+' de '+mesAnt.nombre.toLowerCase()+' en esta planta'+(q?' que coincida con el filtro':'')+'.</p></div>';
     return;
   }
-  cont.innerHTML='<table class="memo-table" style="margin:0"><thead><tr><th>#</th><th>Trabajador</th><th>Cédula</th><th>Días 16–30 junio (código)</th><th>Nº días</th><th>Descuento</th></tr></thead><tbody>'+
+  cont.innerHTML='<table class="memo-table" style="margin:0"><thead><tr><th>#</th><th>Trabajador</th><th>Cédula</th><th>Días 16–'+(DIAS_MES[mesAnt.key]||30)+' '+mesAnt.nombre.toLowerCase()+' (código)</th><th>Nº días</th><th>Descuento</th></tr></thead><tbody>'+
     rows.slice().sort((a,b)=>a.monto-b.monto).map((a,i)=>{const ds=diasListArr(a);
       return `<tr>
         <td>${i+1}</td>
         <td><b>${a.nombre||a.ced}</b></td>
         <td>${a.ced}</td>
-        <td style="font-size:12px">${ds.map(d=>d+'/06('+a.dias[d]+')').join(', ')||'—'}</td>
+        <td style="font-size:12px">${ds.map(d=>d+'/'+mesNumStr+'('+a.dias[d]+')').join(', ')||'—'}</td>
         <td style="text-align:center">${ds.length}</td>
         <td class="money" style="color:var(--bad)">${fmt2(a.monto)}</td>
       </tr>`;}).join('')+'</tbody></table>';
@@ -4445,15 +4472,17 @@ function exportDescuento1630(){
   if(!ARRASTRES.some(a=>a.plant===plant)) calcularDescuento1630(plant);
   const rows=ARRASTRES.filter(a=>a.plant===plant);
   if(!rows.length){toast('No hay descuentos 16-30 para exportar');return;}
-  let csv='CEDULA,TRABAJADOR,PLANTA,DIAS 16-30 (JUNIO),NUM DIAS,VALOR DIA USD,DESCUENTO USD\n';
+  const mesAnt=mesAnteriorDesc1630();
+  const mesNumStr=String(mesAnt.num).padStart(2,'0');
+  let csv='CEDULA,TRABAJADOR,PLANTA,DIAS 16-'+(DIAS_MES[mesAnt.key]||30)+' ('+mesAnt.nombre.toUpperCase()+'),NUM DIAS,VALOR DIA USD,DESCUENTO USD\n';
   rows.slice().sort((a,b)=>a.monto-b.monto).forEach(a=>{const ds=diasListArr(a);
-    csv+=[a.ced,`"${a.nombre||a.ced}"`,plant==='choco'?'Choco':'Isidora',`"${ds.map(d=>d+'/06('+a.dias[d]+')').join(' ')}"`,ds.length,VALOR_DIA_1630.toFixed(3),a.monto.toFixed(2)].join(',')+'\n';});
+    csv+=[a.ced,`"${a.nombre||a.ced}"`,plant==='choco'?'Choco':'Isidora',`"${ds.map(d=>d+'/'+mesNumStr+'('+a.dias[d]+')').join(' ')}"`,ds.length,VALOR_DIA_1630.toFixed(3),a.monto.toFixed(2)].join(',')+'\n';});
   const tot=rows.reduce((s,a)=>s+a.monto,0);
   csv+=['','TOTAL '+(plant==='choco'?'CHOCO':'ISIDORA'),'','',rows.length,'',tot.toFixed(2)].join(',')+'\n';
   const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='Descuento_16-30_junio_'+plant+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
-  toast('Descuento 16-30 exportado ('+rows.length+' trabajadores)');
+  a.download='Descuento_16-30_'+mesAnt.nombre.toLowerCase()+'_'+plant+'_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  toast('Descuento 16-30 ('+mesAnt.nombre+') exportado ('+rows.length+' trabajadores)');
 }
 let _arrastreListExpanded=false;
 function toggleArrastreList(){
