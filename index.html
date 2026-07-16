@@ -422,6 +422,10 @@
     #printArea .memo-sign{page-break-inside:avoid}
     .no-print{display:none !important}
   }
+  @media print{
+    .cert-landscape-mode{size:landscape}
+    .cert-page-break{page-break-before:always}
+  }
   #printArea{display:none}
   .prt-head{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px}
   .prt-head h2{font-size:16px}.prt-head p{font-size:12px;color:#444}
@@ -2805,20 +2809,32 @@ function renderCert(){
     cont.innerHTML='<div class="bio-empty"><div class="big">✓</div><h3 style="color:var(--slate)">Sin excepciones</h3><p>Ejecuta el cruce biométrico o carga incidencias para ver las excepciones a certificar.</p></div>';
     return;
   }
-  cont.innerHTML=Object.entries(gers).sort().map(([ger,its])=>{
+  // Barra de impresión múltiple
+  let multiBar=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:10px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:600;color:var(--slate)">Impresión múltiple:</span>
+    <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.cert-ger-check').forEach(c=>c.checked=true)" style="font-size:11px">Todas</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.querySelectorAll('.cert-ger-check').forEach(c=>c.checked=false)" style="font-size:11px">Ninguna</button>
+    <button class="btn btn-sm" onclick="printMultiGerencia()" style="background:var(--pr);color:#fff;font-size:12px;font-weight:600">🖨 Imprimir seleccionadas</button>
+  </div>`;
+
+  cont.innerHTML=multiBar+Object.entries(gers).sort().map(([ger,its])=>{
     const pend=its.filter(i=>i.status==='pend').length;
     const done=its.length-pend;
+    const gerEsc=ger.replace(/'/g,"\\'");
     return `<div class="cert-ger">
       <div class="cert-ger-head">
-        <span class="gn">${ger}</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" class="cert-ger-check" data-ger="${ger}" style="width:16px;height:16px;accent-color:var(--pr);cursor:pointer">
+          <span class="gn">${ger}</span>
+        </label>
         <span class="gstats">
           <span class="cert-chip tot">${its.length} total</span>
           ${pend?`<span class="cert-chip pend">${pend} pendiente${pend>1?'s':''}</span>`:''}
           ${done?`<span class="cert-chip done">${done} certificada${done>1?'s':''}</span>`:''}
         </span>
         <div class="cert-actions">
-          <button class="btn btn-ghost btn-sm" onclick="printGerencia('${ger.replace(/'/g,"\\'")}')">🖨 Imprimir</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportGerencia('${ger.replace(/'/g,"\\'")}')">⇩ Excel</button>
+          <button class="btn btn-ghost btn-sm" onclick="printGerencia('${gerEsc}')">🖨 Imprimir</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportGerencia('${gerEsc}')">⇩ Excel</button>
         </div>
       </div>
       <div class="cert-ger-body">
@@ -2863,8 +2879,10 @@ function itemsDeGerencia(ger){
   if(CERT_MODO==='descuenta')items=items.filter(i=>i.descuenta);
   return items;
 }
-function printGerencia(ger){
+/* Genera el HTML de UNA página de certificación para una gerencia */
+function _buildCertPage(ger){
   const items=itemsDeGerencia(ger);
+  if(!items.length) return '';
   const plantKey=CURRENT_PLANT==='isidora'?'isidora':'choco';
   const plantN=plantKey==='choco'?'PLANTA CHOCÓ':'MINA ISIDORA';
   const nd=DIAS_MES[ROT_MES]||31;
@@ -2872,12 +2890,11 @@ function printGerencia(ger){
   const headerImg=typeof HEADER_CVM!=='undefined'?HEADER_CVM:null;
   const footerImg=typeof FOOTER_CVM!=='undefined'?FOOTER_CVM:null;
 
-  const thStyle='border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;background:#e8e8e8';
-  const tdStyle='border:1px solid #ccc;padding:2px 1px;font-size:7.5px;text-align:center';
-  const tdNameStyle='border:1px solid #ccc;padding:2px 3px;font-size:7.5px;text-align:left;white-space:nowrap';
+  const thS='border:1px solid #888;padding:4px 3px;font-size:9.5px;text-align:center;background:#e0e0e0;-webkit-print-color-adjust:exact;print-color-adjust:exact';
+  const tdS='border:1px solid #bbb;padding:3px 2px;font-size:9px;text-align:center';
+  const tdN='border:1px solid #bbb;padding:3px 4px;font-size:9px;text-align:left;white-space:nowrap';
 
-  // Header de días
-  const diasTH=dias.map(d=>`<th style="${thStyle};width:18px;min-width:18px">${d}</th>`).join('');
+  const diasTH=dias.map(d=>`<th style="${thS};width:20px;min-width:20px">${d}</th>`).join('');
 
   const rows=items.map((it,i)=>{
     const w=findWorker(plantKey,it.ced);
@@ -2891,65 +2908,85 @@ function printGerencia(ger){
       const bg=isExc?'#FECACA':'';
       const fw=isExc?'700':'400';
       const val=isExc?it.code:c;
-      return `<td style="${tdStyle};background:${bg};font-weight:${fw}">${val}</td>`;
+      return `<td style="${tdS};background:${bg};font-weight:${fw};-webkit-print-color-adjust:exact;print-color-adjust:exact">${val}</td>`;
     }).join('');
     return `<tr>
-      <td style="${tdStyle}">${i+1}</td>
-      <td style="${tdStyle}">${it.ced}</td>
-      <td style="${tdNameStyle}">${it.nombre||''}</td>
-      <td style="${tdNameStyle}">${it.cargo||''}</td>
-      <td style="${tdNameStyle};font-size:7px">${adsc}</td>
-      <td style="${tdStyle}">${cuad}</td>
-      <td style="${tdStyle};font-weight:700">${it.code}</td>
-      <td style="${tdStyle}">${it.descuenta?'Sí':'No'}</td>
+      <td style="${tdS}">${i+1}</td>
+      <td style="${tdS}">${it.ced}</td>
+      <td style="${tdN}">${it.nombre||''}</td>
+      <td style="${tdN}">${it.cargo||''}</td>
+      <td style="${tdN};font-size:8.5px">${adsc}</td>
+      <td style="${tdS}">${cuad}</td>
+      <td style="${tdS};font-weight:700">${it.code}</td>
+      <td style="${tdS}">${it.descuenta?'Sí':'No'}</td>
       ${diasCells}
-      <td style="${tdStyle};font-weight:700">${it.dias.length}</td>
-      <td style="${tdStyle};width:70px"></td>
+      <td style="${tdS};font-weight:700">${it.dias.length}</td>
+      <td style="${tdS};width:80px"></td>
     </tr>`;
   }).join('');
 
-  const clone=document.createElement('div');
-  clone.innerHTML=`
-    <div style="font-family:Arial,sans-serif;padding:10px;color:#000">
-      ${headerImg?`<div style="margin-bottom:8px"><img src="${headerImg}" style="width:100%"></div>`:`
+  return `
+    <div style="font-family:Arial,sans-serif;padding:12px;color:#000">
+      ${headerImg?`<div style="margin-bottom:10px"><img src="${headerImg}" style="width:100%"></div>`:`
         <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:6px">
-          <div style="font-size:13px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
-          <div style="font-size:11px">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
+          <div style="font-size:14px;font-weight:bold">CORPORACIÓN VENEZOLANA DE MINERÍA — CVM</div>
+          <div style="font-size:12px">Parque Industrial Minero III Chocó–Isidora · Coordinación de Gestión Humana</div>
         </div>`}
-      <h3 style="text-align:center;margin:8px 0 2px;font-size:12px">REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN — CON CORRIDA DE ROTACIÓN</h3>
-      <p style="text-align:center;font-size:10px;margin:0 0 8px">${plantN} · ${mesLabel()} · Gerencia: ${ger}<br>${CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'}</p>
+      <h3 style="text-align:center;margin:10px 0 3px;font-size:14px">REPORTE DE EXCEPCIONES PARA CERTIFICACIÓN — CON CORRIDA DE ROTACIÓN</h3>
+      <p style="text-align:center;font-size:11px;margin:0 0 10px">${plantN} · ${mesLabel()} · Gerencia: ${ger}<br>${CERT_MODO==='descuenta'?'Solo excepciones que descuentan':'Todas las excepciones'}</p>
       <table style="width:100%;border-collapse:collapse">
         <thead><tr>
-          <th style="${thStyle}">#</th>
-          <th style="${thStyle}">Cédula</th>
-          <th style="${thStyle}">Nombre y Apellido</th>
-          <th style="${thStyle}">Cargo</th>
-          <th style="${thStyle}">Adscripción</th>
-          <th style="${thStyle}">Cuadr.</th>
-          <th style="${thStyle}">Cód.</th>
-          <th style="${thStyle}">Desc.</th>
+          <th style="${thS}">#</th>
+          <th style="${thS}">Cédula</th>
+          <th style="${thS}">Nombre y Apellido</th>
+          <th style="${thS}">Cargo</th>
+          <th style="${thS}">Adscripción</th>
+          <th style="${thS}">Cuadr.</th>
+          <th style="${thS}">Cód.</th>
+          <th style="${thS}">Desc.</th>
           ${diasTH}
-          <th style="${thStyle}">Total</th>
-          <th style="${thStyle}">Certifica</th>
+          <th style="${thS}">Total</th>
+          <th style="${thS}">Certifica</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="margin-top:14px;font-size:10px"><b>Total trabajadores:</b> ${items.length} · <b>Total días excepción:</b> ${items.reduce((s,it)=>s+it.dias.length,0)}</div>
-      <div style="margin-top:40px;display:flex;justify-content:space-around;font-size:10px">
-        <div style="text-align:center;border-top:1px solid #000;padding-top:5px;width:200px">Certificado por (Gerencia)</div>
-        <div style="text-align:center;border-top:1px solid #000;padding-top:5px;width:200px">Coordinación de Gestión Humana</div>
+      <div style="margin-top:14px;font-size:11px"><b>Total trabajadores:</b> ${items.length} · <b>Total días excepción:</b> ${items.reduce((s,it)=>s+it.dias.length,0)}</div>
+      <div style="margin-top:40px;display:flex;justify-content:space-around;font-size:11px">
+        <div style="text-align:center;border-top:1px solid #000;padding-top:6px;width:220px">Certificado por (Gerencia)</div>
+        <div style="text-align:center;border-top:1px solid #000;padding-top:6px;width:220px">Coordinación de Gestión Humana</div>
       </div>
-      ${footerImg?`<div style="margin-top:16px"><img src="${footerImg}" style="width:100%"></div>`:''}
+      ${footerImg?`<div style="margin-top:18px"><img src="${footerImg}" style="width:100%"></div>`:''}
     </div>`;
+}
 
-  // Aplicar estilos inline para impresión confiable
-  clone.querySelectorAll('th').forEach(th=>{th.style.background='#e8e8e8';});
+function printGerencia(ger){
+  _doPrintCert([ger]);
+}
+
+function printMultiGerencia(){
+  const checks=document.querySelectorAll('.cert-ger-check:checked');
+  if(!checks.length){toast('Selecciona al menos una gerencia');return;}
+  const gers=Array.from(checks).map(c=>c.dataset.ger);
+  _doPrintCert(gers);
+}
+
+function _doPrintCert(gerencias){
+  // Inyectar @page landscape via style tag temporal
+  let styleTag=document.getElementById('_certPrintStyle');
+  if(!styleTag){styleTag=document.createElement('style');styleTag.id='_certPrintStyle';document.head.appendChild(styleTag);}
+  styleTag.textContent='@page{size:landscape}';
+
+  const pages=gerencias.map((g,i)=>{
+    const html=_buildCertPage(g);
+    return (i>0?'<div style="page-break-before:always"></div>':'')+html;
+  }).join('');
 
   const pa=document.getElementById('printArea');
-  pa.innerHTML='';pa.appendChild(clone);
+  pa.innerHTML=pages;
   pa.style.display='block';
   window.print();
   pa.style.display='none';
+  styleTag.textContent=''; // limpiar landscape
 }
 function exportGerencia(ger){
   const items=itemsDeGerencia(ger);
