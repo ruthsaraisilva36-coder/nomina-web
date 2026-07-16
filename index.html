@@ -2676,12 +2676,60 @@ function filterAus(){
 }
 function exportAusencias(){
   if(!CRUCE_RESULT||!CRUCE_RESULT.ausencias.length){toast('No hay ausencias para exportar');return;}
-  let csv='CEDULA,NOMBRE,GRUPO,DIA,FECHA,TURNO,OBSERVACION\n';
+  if(typeof XLSX==='undefined'){toast('No se pudo cargar la librería de Excel');return;}
+  const plant=CRUCE_RESULT.plant;
+  const nd=DIAS_MES[ROT_MES]||31;
+  const dias=Array.from({length:nd},(_,i)=>i+1);
+  const plantN=plant==='choco'?'PLANTA CHOCÓ':'MINA ISIDORA';
+  const mesN=mesNombre(ROT_MES)||'';
+
+  // Agrupar ausencias por trabajador
+  const byW={};
   CRUCE_RESULT.ausencias.forEach(a=>{
-    csv+=[a.ced,`"${a.nombre||''}"`,`"${a.cuadrilla||''}"`,a.dia,a.fecha,a.rot,'Ausencia - sin marca ni soporte'].join(',')+'\n';
+    if(!byW[a.ced]) byW[a.ced]={ced:a.ced,nombre:a.nombre,cuadrilla:a.cuadrilla,dias:[]};
+    byW[a.ced].dias.push(a.dia);
   });
-  downloadCSV(csv,'Ausencias_'+CRUCE_RESULT.plant+'_'+mesLabel().replace(' ','_')+'.csv');
-  toast('Ausencias exportadas');
+  const lista=Object.values(byW).sort((a,b)=>(parseInt(a.ced,10)||0)-(parseInt(b.ced,10)||0));
+
+  // Header
+  const aoa=[
+    ['CRUCE BIOMÉTRICO — AUSENCIAS CON CORRIDA DE ROTACIÓN'],
+    [plantN+' · '+mesN],
+    [],
+    ['N°','CÉDULA','APELLIDOS Y NOMBRES','UNIDAD DE ADSCRIPCIÓN','GRUPO/CUADRILLA'].concat(dias).concat(['TOTAL AUSENCIAS'])
+  ];
+
+  lista.forEach((t,idx)=>{
+    const w=findWorker(plant,t.ced);
+    const adsc=w?(w.adscripcion||'SIN ADSCRIPCIÓN'):'SIN ADSCRIPCIÓN';
+    const r=corridaTrabajador(plant,t.ced);
+    const corrida=r?r.arr:new Array(nd).fill('?');
+    // Marcar los días de ausencia con "A" sobre la corrida
+    const fila=corrida.slice(0,nd).map((c,i)=>{
+      const dia=i+1;
+      if(t.dias.includes(dia)) return 'A';
+      return c;
+    });
+    aoa.push([idx+1, parseInt(t.ced,10)||t.ced, t.nombre||'', adsc, t.cuadrilla||''].concat(fila).concat([t.dias.length]));
+  });
+
+  // Fila total
+  const totalAus=lista.reduce((s,t)=>s+t.dias.length,0);
+  aoa.push([]);
+  aoa.push(['','','','','TOTAL TRABAJADORES: '+lista.length].concat(new Array(nd).fill('')).concat([totalAus]));
+
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  // Anchos de columna
+  const cols=[{wch:5},{wch:12},{wch:34},{wch:28},{wch:18}];
+  for(let i=0;i<nd;i++) cols.push({wch:4});
+  cols.push({wch:10});
+  ws['!cols']=cols;
+  XLSX.utils.book_append_sheet(wb,ws,'AUSENCIAS CON CORRIDA');
+
+  const fname='Ausencias_Corrida_'+plant+'_'+mesN.replace(/\s+/g,'_')+'.xlsx';
+  XLSX.writeFile(wb,fname);
+  toast('Excel exportado: '+fname);
 }
 
 /* ============================================================
