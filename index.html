@@ -691,14 +691,20 @@
         <!-- TAB GRUPOS -->
         <div id="rtab-grupos">
           <div class="info-note"><span class="ic">⟳</span>
-            <div>El sistema <b>dedujo el patrón de junio</b> de cada grupo y proyectó <b>julio</b> continuando la secuencia. Verifica cada grupo y corrige el día que haga falta. Los grupos marcados <b>"Revisar"</b> no tenían un patrón claro — complétalos tú.</div>
+            <div>El sistema proyecta la rotación de cada mes a partir del anterior. Selecciona el mes, verifica y corrige. Los grupos marcados <b>"Revisar"</b> tienen días sin definir — complétalos.</div>
           </div>
           <div class="rot-head">
             <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Mes a cuadrar:</label>
             <select id="rotMes">
-              <option value="jul">Julio 2026 (proyectado)</option>
-              <option value="jun">Junio 2026 (base, leído de nómina)</option>
+              <option value="jul">Julio 2026</option>
+              <option value="ago">Agosto 2026</option>
+              <option value="sep">Septiembre 2026</option>
+              <option value="oct">Octubre 2026</option>
+              <option value="nov">Noviembre 2026</option>
+              <option value="dic">Diciembre 2026</option>
+              <option value="jun">Junio 2026 (base)</option>
             </select>
+            <button class="btn btn-au btn-sm" onclick="proyectarMesGrupos()" style="width:auto" id="btnProyGrupos">⟳ Proyectar grupos</button>
             <button class="btn btn-ghost btn-sm" onclick="exportRotacion()" style="width:auto">⇩ Exportar Excel (con incidencias)</button>
             <span class="count" id="rotGroupCount"></span>
           </div>
@@ -793,7 +799,7 @@
         <div style="margin-bottom:14px">
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="document.getElementById('incImpFile').click()">⇊ Importar incidencias desde PRODUCCIÓN (nómina)</button>
           <input type="file" id="incImpFile" accept=".xlsx,.xls" style="display:none" onchange="importIncidenciasProduccion(this.files);this.value=''">
-          <span style="font-size:12px;color:var(--muted);margin-left:8px">Lee la corrida diaria del mes seleccionado en Rotación mensual (junio o julio) y carga R, A, V, PNR, PR, DC, etc.</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px">Lee la corrida diaria del mes seleccionado en Rotación mensual y carga R, A, V, PNR, PR, DC, etc.</span>
         </div>
 
         <div class="inc-summary" id="incSummary"></div>
@@ -944,6 +950,10 @@
             <option value="jun">Junio 2026</option>
             <option value="jul" selected>Julio 2026</option>
             <option value="ago">Agosto 2026</option>
+            <option value="sep">Septiembre 2026</option>
+            <option value="oct">Octubre 2026</option>
+            <option value="nov">Noviembre 2026</option>
+            <option value="dic">Diciembre 2026</option>
           </select>
           <button class="btn btn-au" style="width:auto" onclick="runCalculo()">⚡ Calcular nómina</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="exportCaracas()">⬇ Exportar para Caracas (planta seleccionada)</button>
@@ -1565,10 +1575,27 @@ let MES_PAGO='jul';           // MES DE PAGO: lo que sale en memos y reportes
 // lo que hacia que las ausencias del dia 1 no contaran en su mes.
 function _pd(x){ if(x instanceof Date) return x;
   const p=String(x).slice(0,10).split('-'); return new Date(+p[0],(+p[1])-1,+p[2]); }
-const DIAS_MES={jun:30,jul:31,ago:31};
-const MES_NOMBRE={jun:'Junio 2026',jul:'Julio 2026',ago:'Agosto 2026'};
-const MES_NUM={jun:6,jul:7,ago:8};
-const DOW_JUN=1, DOW_JUL=3; // 1-jun-2026 = lunes(1); 1-jul-2026 = miércoles(3) [0=dom]
+// Dynamic month support - 2026
+const _MESES_INFO = {
+  jun:{nombre:'Junio 2026',dias:30,num:6},
+  jul:{nombre:'Julio 2026',dias:31,num:7},
+  ago:{nombre:'Agosto 2026',dias:31,num:8},
+  sep:{nombre:'Septiembre 2026',dias:30,num:9},
+  oct:{nombre:'Octubre 2026',dias:31,num:10},
+  nov:{nombre:'Noviembre 2026',dias:30,num:11},
+  dic:{nombre:'Diciembre 2026',dias:31,num:12}
+};
+const MESES_KEYS=['jun','jul','ago','sep','oct','nov','dic'];
+function mesDias(m){return (_MESES_INFO[m]||{}).dias||30;}
+function mesNombre(m){return (_MESES_INFO[m]||{}).nombre||m;}
+function mesNum(m){return (_MESES_INFO[m]||{}).num||7;}
+function mesDOW(m){return new Date(2026,mesNum(m)-1,1).getDay();}
+function mesPrev(m){const i=MESES_KEYS.indexOf(m); return i>0?MESES_KEYS[i-1]:null;}
+// Backward-compatible constants
+const DIAS_MES={jun:30,jul:31,ago:31,sep:30,oct:31,nov:30,dic:31};
+const MES_NOMBRE={jun:'Junio 2026',jul:'Julio 2026',ago:'Agosto 2026',sep:'Septiembre 2026',oct:'Octubre 2026',nov:'Noviembre 2026',dic:'Diciembre 2026'};
+const MES_NUM={jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
+// DOW_JUN/DOW_JUL removed — use mesDOW(mesKey) everywhere
 const DOWLBL=['D','L','M','M','J','V','S'];
 
 function rotGroupsFor(){
@@ -1592,13 +1619,23 @@ function renderRotacion(){
   const {plant,groups}=rotGroupsFor();
   const keys=Object.keys(groups).sort();
   const nd=DIAS_MES[ROT_MES];
-  const dow0 = ROT_MES==='jun'?DOW_JUN:DOW_JUL;
+  const dow0 = mesDOW(ROT_MES);
   document.getElementById('rotGroupCount').textContent=keys.length+' grupos · '+(plant==='choco'?'Chocó':'Isidora');
   const cont=document.getElementById('rotGroups');
   cont.innerHTML=keys.map(g=>{
     const info=groups[g];
-    let seq=(ROT_MES==='jun'?info.jun:info.jul).slice(0,nd);
+    let seq=(info[ROT_MES]||[]).slice(0,nd);
     while(seq.length<nd) seq.push('?');
+    // Auto-project from previous month if current month has no data
+    if(seq.every(c=>c==='?') && mesPrev(ROT_MES)){
+      const prevKey=mesPrev(ROT_MES);
+      const prevSeq=(info[prevKey]||[]).slice(0,mesDias(prevKey));
+      if(prevSeq.length && !prevSeq.every(c=>c==='?')){
+        const prevDias=mesDias(prevKey);
+        seq=Array.from({length:nd},(_,j)=>prevSeq[(prevDias+j)%prevSeq.length]||'?');
+        info[ROT_MES]=seq;
+      }
+    }
     const hasQ = seq.some(c=>c==='?');
     const needsRev = hasQ; // solo revisar si hay días sin definir
     const days=seq.map((c,i)=>{
@@ -1633,15 +1670,13 @@ function renderRotacion(){
     let rev=[], okc=0;
     keys.forEach(g=>{
       const info=groups[g];
-      const jq=(info.jun||[]).filter(c=>c==='?').length;
-      const lq=(info.jul||[]).filter(c=>c==='?').length;
+      const sq=(info[ROT_MES]||[]).filter(c=>c==='?').length;
       const motivos=[];
-      if(jq) motivos.push(jq+' hueco'+(jq>1?'s':'')+' junio');
-      if(lq) motivos.push(lq+' hueco'+(lq>1?'s':'')+' julio');
+      if(sq) motivos.push(sq+' hueco'+(sq>1?'s':'')+' '+mesNombre(ROT_MES));
       if(motivos.length) rev.push({g, count:info.count, motivos}); else okc++;
     });
     const indivs=(typeof ROT_INDIVIDUAL!=='undefined')?(ROT_INDIVIDUAL[plant]||[]):[];
-    const indivRev=indivs.filter(w=>(w.jun||[]).includes('?')||(w.jul||[]).includes('?'));
+    const indivRev=indivs.filter(w=>(w[ROT_MES]||[]).includes('?'));
     const st=(n,txt,color)=>`<div style="flex:1;min-width:100px;background:#fff;border:1px solid #E6E9EE;border-radius:10px;padding:10px 12px;text-align:center"><div style="font-size:22px;font-weight:800;color:${color}">${n}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">${txt}</div></div>`;
     let html=`<div style="background:var(--slate-2,#F4F6F9);border:1px solid #E6E9EE;border-radius:14px;padding:14px 16px;margin-bottom:16px">
       <div style="font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">🩺 Diagnóstico de rotaciones · ${plant==='choco'?'Chocó':'Isidora'}</div>
@@ -1662,7 +1697,7 @@ function renderRotacion(){
         `<div style="font-size:12.5px;background:var(--bad-bg);border-radius:8px;padding:6px 10px">⚠ ${w.nombre} <span style="color:var(--muted)">· C.I. ${w.ced} · ${w.cuadrilla}</span></div>`).join('')+'</div>';
     }
     if(!rev.length && !indivRev.length){
-      html+='<div style="font-size:13px;color:var(--ok);font-weight:600">✓ Todas las cuadrillas y trabajadores tienen patrón completo para junio y julio.</div>';
+      html+='<div style="font-size:13px;color:var(--ok);font-weight:600">✓ Todas las cuadrillas y trabajadores tienen patrón completo para '+mesNombre(ROT_MES)+'.</div>';
     }
     html+='</div>';
     cont.insertAdjacentHTML('afterbegin', html);
@@ -1672,31 +1707,31 @@ function renderRotacion(){
   if(typeof ROT_INDIVIDUAL!=='undefined'){
     const indivs=ROT_INDIVIDUAL[plant]||[];
     if(indivs.length){
-      const dow0=ROT_MES==='jun'?DOW_JUN:DOW_JUL;
+      const dow0=mesDOW(ROT_MES);
       let html='<div class="section-title" style="margin-top:24px">Rotación individual · por cuadrilla <span class="gcount" style="margin-left:8px">'+indivs.length+' trabajadores</span></div>';
       html+=`<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
         <span style="font-size:12.5px;color:var(--muted)">Cada trabajador libra distinto — su rotación es propia. Agrupados por cuadrilla para revisar más fácil.</span>
         <button class="btn btn-au btn-sm" style="width:auto" onclick="document.getElementById('rotIndivFile').click()">⬆ Importar rotaciones (Excel)</button>
         <button class="btn btn-ghost btn-sm" style="width:auto" onclick="descargarPlantillaIndiv()">⇩ Descargar plantilla</button>
-        <button class="btn btn-au btn-sm" style="width:auto" onclick="proyectarJulioTodos()">⟳ Proyectar julio de todos</button>
+        <button class="btn btn-au btn-sm" style="width:auto" onclick="proyectarMesTodos()">⟳ Proyectar ${mesNombre(ROT_MES)} de todos</button>
         <input type="file" id="rotIndivFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarRotIndiv(this.files);this.value=''">
       </div>
-      <div class="info-note" style="margin-bottom:12px"><span class="ic">✎</span><div>Corrige los días en <b>junio</b> (cada casilla es un desplegable D/N/L/48/96). Luego pulsa <b>⟳ Proyectar julio</b> — por trabajador o por cuadrilla — y el sistema le da continuidad al mes siguiente según el ciclo de cada quien.</div></div>`;
+      <div class="info-note" style="margin-bottom:12px"><span class="ic">✎</span><div>Corrige los días en <b>${mesNombre(mesPrev(ROT_MES)||ROT_MES)}</b> (cada casilla es un desplegable D/N/L/48/96). Luego pulsa <b>⟳ Proyectar ${mesNombre(ROT_MES)}</b> — por trabajador o por cuadrilla — y el sistema le da continuidad al mes siguiente según el ciclo de cada quien.</div></div>`;
       // agrupar por cuadrilla conservando el índice original
       const porCuad={};
       indivs.forEach((w,wi)=>{ const cu=w.cuadrilla||'(sin cuadrilla)'; (porCuad[cu]=porCuad[cu]||[]).push({w,wi}); });
       Object.keys(porCuad).sort().forEach(cu=>{
         const list=porCuad[cu].sort((a,b)=>(parseInt(a.w.ced,10)||0)-(parseInt(b.w.ced,10)||0));
-        const nRev=list.filter(({w})=>(w.jun||[]).includes('?')||(w.jul||[]).every(c=>c==='?')).length;
+        const nRev=list.filter(({w})=>(w[ROT_MES]||[]).includes('?')||(w[ROT_MES]||[]).length===0).length;
         html+=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid #E6E9EE">
           <span style="font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.4px">${cu}</span>
           <span class="gcount">${list.length} trab.</span>
           ${nRev?`<span class="rot-badge rev">⚠ ${nRev} por revisar</span>`:'<span class="rot-badge ok">✓ completos</span>'}
-          <button class="btn btn-ghost btn-sm" style="width:auto;padding:3px 12px;font-size:11.5px;margin-left:auto" onclick="proyectarJulioCuadrilla('${plant}','${cu.replace(/'/g,"&#39;")}')" title="Reproyectar julio de toda la cuadrilla">⟳ Proyectar julio de la cuadrilla</button>
+          <button class="btn btn-ghost btn-sm" style="width:auto;padding:3px 12px;font-size:11.5px;margin-left:auto" onclick="proyectarMesCuadrilla('${plant}','${cu.replace(/'/g,"&#39;")}')" title="Reproyectar ${mesNombre(ROT_MES)} de toda la cuadrilla">⟳ Proyectar ${mesNombre(ROT_MES)} de la cuadrilla</button>
         </div>`;
         list.forEach(({w,wi})=>{
-          const seq=ROT_MES==='jun'?w.jun:w.jul;
-          const needsRev=(w.jun||[]).includes('?')||(w.jul||[]).every(c=>c==='?');
+          const seq=w[ROT_MES]||[];
+          const needsRev=(w[ROT_MES]||[]).includes('?')||(w[ROT_MES]||[]).length===0;
           const days=Array.from({length:nd},(_, i)=>{
             const c=seq[i]||'?';
             const dow=(dow0+i)%7; const wk=(dow===0||dow===6);
@@ -1710,7 +1745,7 @@ function renderRotacion(){
             <div class="rot-group-head" style="padding:9px 14px">
               <span class="gname" style="font-size:13px">${w.nombre||w.ced}</span>
               <span class="gcount">C.I. ${w.ced}</span>
-              <button class="btn btn-ghost btn-sm" style="width:auto;padding:3px 10px;font-size:11.5px" onclick="proyectarJulioIndiv('${plant}',${wi})" title="Reproyectar julio desde junio">⟳ Proyectar julio</button>
+              <button class="btn btn-ghost btn-sm" style="width:auto;padding:3px 10px;font-size:11.5px" onclick="proyectarMesSiguiente('${plant}',${wi})" title="Reproyectar ${mesNombre(ROT_MES)} desde ${mesNombre(mesPrev(ROT_MES)||ROT_MES)}">⟳ Proyectar ${mesNombre(ROT_MES)}</button>
               <span class="rot-badge ${needsRev?'rev':'ok'}">${needsRev?'⚠ Revisar':'✓'}</span>
             </div>
             <div class="rot-days" style="padding:8px 14px">${days}</div>
@@ -1725,14 +1760,14 @@ function rotIndivChange(sel){
   const [plantKey,wi]=sel.dataset.ri.split('_');
   const d=+sel.dataset.d;
   const v=sel.value==='48/96'?'48/96':sel.value;
-  const arr=ROT_MES==='jun'?ROT_INDIVIDUAL[plantKey][+wi].jun:ROT_INDIVIDUAL[plantKey][+wi].jul;
+  const w_=ROT_INDIVIDUAL[plantKey][+wi]; if(!w_[ROT_MES]) w_[ROT_MES]=[]; const arr=w_[ROT_MES];
   while(arr.length<=d) arr.push('?');
   arr[d]=v;
   sel.className=['D','N'].includes(v)?v:v==='L'?'L':v==='48/96'?'D':'q';
   toast('Rotación individual actualizada · día '+(d+1)+' → '+v);
 }
 
-/* === CONTINUIDAD: reproyectar julio desde junio corregido === */
+/* === CONTINUIDAD: reproyectar mes siguiente desde el anterior corregido === */
 function rotCicloLen(cuad){
   cuad=String(cuad||'');
   if(/48\/96/.test(cuad))return 6;      // 2 guardia + 4 libres (médicos)
@@ -1751,43 +1786,75 @@ function rotSelfCanon(jun,L){
   for(let p=0;p<L;p++)if(!canon[p])canon[p]=canon[(p-1+L)%L]||canon[(p+1)%L]||'?';
   return canon;
 }
-function proyectarJulioIndiv(plant,wi){
+function proyectarMesSiguiente(plant,wi){
+  const prev=mesPrev(ROT_MES);
+  if(!prev){toast('No hay mes anterior para proyectar');return;}
   const w=ROT_INDIVIDUAL[plant][+wi];
   const L=rotCicloLen(w.cuadrilla);
-  if(!L){toast('No reconozco el ciclo de "'+w.cuadrilla+'" — ajusta julio a mano');return;}
-  const jun=(w.jun||[]).slice(0,30);
-  if(jun.some(c=>!['D','N','L','48/96'].includes(c))){toast('Junio tiene días sin definir (?, R, etc.). Corrígelos y vuelve a proyectar.');return;}
-  const canon=rotSelfCanon(jun,L);
-  w.jul=Array.from({length:31},(_,j)=>canon[(30+j)%L]);
-  const cur=ROT_MES; ROT_MES='jul'; renderRotacion(); document.getElementById('rotMes').value='jul';
-  toast('✓ Julio proyectado desde junio para '+(w.nombre||w.ced));
+  if(!L){toast('No reconozco el ciclo de "'+w.cuadrilla+'" — ajusta a mano');return;}
+  const prevSeq=(w[prev]||[]).slice(0,mesDias(prev));
+  if(prevSeq.some(c=>!['D','N','L','48/96'].includes(c))){toast(mesNombre(prev)+' tiene días sin definir. Corrígelos primero.');return;}
+  const canon=rotSelfCanon(prevSeq,L);
+  const prevDias=mesDias(prev);
+  const nextDias=mesDias(ROT_MES);
+  w[ROT_MES]=Array.from({length:nextDias},(_,j)=>canon[(prevDias+j)%L]);
+  renderRotacion();
+  toast('✓ '+mesNombre(ROT_MES)+' proyectado desde '+mesNombre(prev)+' para '+(w.nombre||w.ced));
 }
-function proyectarJulioTodos(){
+function proyectarMesTodos(){
   const plant=CURRENT_PLANT;
   if(plant==='ambas'){toast('Selecciona Chocó o Isidora');return;}
+  const prev=mesPrev(ROT_MES);
+  if(!prev){toast('No hay mes anterior para proyectar');return;}
   let ok=0,skip=[];
-  (ROT_INDIVIDUAL[plant]||[]).forEach((w)=>{
+  (ROT_INDIVIDUAL[plant]||[]).forEach((w,wi)=>{
     const L=rotCicloLen(w.cuadrilla);
-    const jun=(w.jun||[]).slice(0,30);
-    if(!L||jun.some(c=>!['D','N','L','48/96'].includes(c))){skip.push(w.nombre||w.ced);return;}
-    const canon=rotSelfCanon(jun,L);
-    w.jul=Array.from({length:31},(_,j)=>canon[(30+j)%L]); ok++;
+    const prevSeq=(w[prev]||[]).slice(0,mesDias(prev));
+    if(!L||prevSeq.some(c=>!['D','N','L','48/96'].includes(c))){skip.push(w.nombre||w.ced);return;}
+    const canon=rotSelfCanon(prevSeq,L);
+    w[ROT_MES]=Array.from({length:mesDias(ROT_MES)},(_,j)=>canon[(mesDias(prev)+j)%L]); ok++;
   });
-  ROT_MES='jul'; renderRotacion(); document.getElementById('rotMes').value='jul';
-  toast('✓ Julio proyectado para '+ok+' trabajadores'+(skip.length?' · '+skip.length+' con junio incompleto (revisar)':''));
+  renderRotacion();
+  toast('✓ '+mesNombre(ROT_MES)+' proyectado para '+ok+' trabajadores'+(skip.length?' · '+skip.length+' con '+mesNombre(prev)+' incompleto':''));
 }
-function proyectarJulioCuadrilla(plant,cuad){
+function proyectarMesCuadrilla(plant,cuad){
+  const prev=mesPrev(ROT_MES);
+  if(!prev){toast('No hay mes anterior');return;}
   let ok=0,skip=0;
   (ROT_INDIVIDUAL[plant]||[]).forEach(w=>{
     if((w.cuadrilla||'')!==cuad)return;
     const L=rotCicloLen(w.cuadrilla);
-    const jun=(w.jun||[]).slice(0,30);
-    if(!L||jun.some(c=>!['D','N','L','48/96'].includes(c))){skip++;return;}
-    const canon=rotSelfCanon(jun,L);
-    w.jul=Array.from({length:31},(_,j)=>canon[(30+j)%L]); ok++;
+    const prevSeq=(w[prev]||[]).slice(0,mesDias(prev));
+    if(!L||prevSeq.some(c=>!['D','N','L','48/96'].includes(c))){skip++;return;}
+    const canon=rotSelfCanon(prevSeq,L);
+    w[ROT_MES]=Array.from({length:mesDias(ROT_MES)},(_,j)=>canon[(mesDias(prev)+j)%L]); ok++;
   });
-  ROT_MES='jul'; renderRotacion(); const sel=document.getElementById('rotMes'); if(sel)sel.value='jul';
-  toast('✓ '+cuad+': julio proyectado para '+ok+' trab.'+(skip?' · '+skip+' con junio incompleto':''));
+  renderRotacion();
+  toast('✓ '+cuad+': '+mesNombre(ROT_MES)+' proyectado para '+ok+' trab.'+(skip?' · '+skip+' con '+mesNombre(prev)+' incompleto':''));
+}
+// Backward-compatible aliases
+function proyectarJulioIndiv(p,w){ROT_MES='jul';proyectarMesSiguiente(p,w);}
+function proyectarJulioTodos(){ROT_MES='jul';proyectarMesTodos();}
+function proyectarJulioCuadrilla(p,c){ROT_MES='jul';proyectarMesCuadrilla(p,c);}
+
+/* === Proyectar el mes seleccionado para TODOS los grupos === */
+function proyectarMesGrupos(){
+  const mes=ROT_MES;
+  const prev=mesPrev(mes);
+  if(!prev){toast('Junio es el mes base — no se puede proyectar');return;}
+  if(CURRENT_PLANT==='ambas'){toast('Selecciona Chocó o Isidora');return;}
+  const {plant,groups}=rotGroupsFor();
+  let ok=0,skip=0;
+  Object.keys(groups).forEach(g=>{
+    const info=groups[g];
+    const prevArr=(info[prev]||[]).slice(0,mesDias(prev));
+    if(!prevArr.length||prevArr.every(c=>c==='?')){skip++;return;}
+    const prevDias=mesDias(prev);
+    info[mes]=Array.from({length:mesDias(mes)},(_,j)=>prevArr[(prevDias+j)%prevArr.length]||'?');
+    ok++;
+  });
+  renderRotacion();
+  toast('✓ '+mesNombre(mes)+': '+ok+' grupos proyectados desde '+mesNombre(prev)+(skip?' · '+skip+' sin datos en '+mesNombre(prev):''));
 }
 
 /* Importar rotaciones individuales desde Excel */
@@ -1815,11 +1882,12 @@ function importarRotIndiv(fileList){
           // si no existe, crearlo
           const w=findWorker(plant,ced);
           if(!w){noEncontrados++;return;}
-          const nuevo={ced,nombre:w.nombre,cuadrilla:w.cuadrilla,jun:[],jul:[]};
+          const nuevo={ced,nombre:w.nombre,cuadrilla:w.cuadrilla,jun:[],jul:[],ago:[],sep:[],oct:[],nov:[],dic:[]};
           if(!ROT_INDIVIDUAL[plant])ROT_INDIVIDUAL[plant]=[];
           ROT_INDIVIDUAL[plant].push(nuevo);
           const ref=ROT_INDIVIDUAL[plant][ROT_INDIVIDUAL[plant].length-1];
-          const arr=ROT_MES==='jun'?ref.jun:ref.jul;
+          if(!ref[ROT_MES]) ref[ROT_MES]=[];
+          const arr=ref[ROT_MES];
           for(let d=0;d<nd;d++){
             let val=String(row[d+1]||'').trim().toUpperCase();
             if(val==='48')val='48/96';
@@ -1827,7 +1895,8 @@ function importarRotIndiv(fileList){
           }
           actualizados++;
         }else{
-          const arr=ROT_MES==='jun'?indiv.jun:indiv.jul;
+          if(!indiv[ROT_MES]) indiv[ROT_MES]=[];
+          const arr=indiv[ROT_MES];
           for(let d=0;d<nd;d++){
             let val=String(row[d+1]||'').trim().toUpperCase();
             if(val==='48')val='48/96';
@@ -1850,22 +1919,22 @@ function descargarPlantillaIndiv(){
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
   if(CURRENT_PLANT==='ambas'){toast('Selecciona Chocó o Isidora');return;}
   const nd=DIAS_MES[ROT_MES];
-  const mesNum=ROT_MES==='jun'?6:7;
-  const dow0=ROT_MES==='jun'?DOW_JUN:DOW_JUL;
+  const _mesNum=mesNum(ROT_MES);
+  const dow0=mesDOW(ROT_MES);
   const DOW3=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   const plantN=plant==='choco'?'Planta Chocó':'Mina Isidora';
   let csv=`PLANTILLA ROTACION INDIVIDUAL - ${plantN}\n`;
   csv+=`Mes: ${mesLabel()} - Llena los códigos (D, N, L, 48/96) para cada día\n\n`;
   // encabezado con fechas
   const dayHeaders=Array.from({length:nd},(_,i)=>{
-    const dd=String(i+1).padStart(2,'0'), mm=String(mesNum).padStart(2,'0');
+    const dd=String(i+1).padStart(2,'0'), mm=String(_mesNum).padStart(2,'0');
     return `${dd}/${mm}/2026 (${DOW3[(dow0+i)%7]})`;
   });
   csv+='CEDULA,NOMBRE,CUADRILLA,'+dayHeaders.join(',')+'\n';
   // llenar con datos actuales
   const indivs=ROT_INDIVIDUAL[plant]||[];
   indivs.forEach(w=>{
-    const seq=ROT_MES==='jun'?w.jun:w.jul;
+    const seq=w[ROT_MES]||[];
     const dias=Array.from({length:nd},(_,i)=>{
       const c=seq[i]||'';
       return c==='?'?'':c;
@@ -1884,7 +1953,8 @@ function descargarPlantillaIndiv(){
 function rotChange(sel){
   const g=sel.dataset.g, d=+sel.dataset.d, v=sel.value;
   const {plant,groups}=rotGroupsFor();
-  const arr=ROT_MES==='jun'?groups[g].jun:groups[g].jul;
+  if(!groups[g][ROT_MES]) groups[g][ROT_MES]=[];
+  const arr=groups[g][ROT_MES];
   while(arr.length<=d) arr.push('?');
   arr[d]=v;
   sel.className=['D','N','L'].includes(v)?v:'q';
@@ -1915,15 +1985,15 @@ function cambioLookup(){
 }
 function patternForCuad(plant,cuad,ced){
   const g=(ROTACIONES[plant]||{})[cuad];
-  if(g) return ROT_MES==='jun'?g.jun:g.jul;
+  if(g) return g[ROT_MES]||[];
   const indiv=(ROT_INDIVIDUAL[plant]||[]).find(w=>w.ced===ced&&w.cuadrilla===cuad);
-  if(indiv) return ROT_MES==='jun'?indiv.jun:indiv.jul;
+  if(indiv) return indiv[ROT_MES]||[];
   return null;
 }
 /* corrida base considerando cambios de cuadrilla vigentes en el mes */
 function baseCorridaConCambios(plant,ced,cuadrillaActual){
-  const nd=DIAS_MES[ROT_MES]; const mesNum=ROT_MES==='jun'?6:7;
-  const camb=CAMBIOS_CUADRILLA.filter(c=>c.plant===plant&&normCed(c.ced)===normCed(ced)&&(+String(c.fecha).slice(5,7))===mesNum)
+  const nd=DIAS_MES[ROT_MES]; const _mN=mesNum(ROT_MES);
+  const camb=CAMBIOS_CUADRILLA.filter(c=>c.plant===plant&&normCed(c.ced)===normCed(ced)&&(+String(c.fecha).slice(5,7))===_mN)
     .sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   if(!camb.length) return rotArrayFor(plant,cuadrillaActual,ced);
   const segs=[{desde:1,cuad:camb[0].de}];
@@ -2098,12 +2168,12 @@ function rotArrayFor(plant,grupo,ced){
   // 1. Buscar rotación individual (21X7 / 48/96)
   if(ced && typeof ROT_INDIVIDUAL!=='undefined'){
     const indiv=(ROT_INDIVIDUAL[plant]||[]).find(w=>w.ced===ced);
-    if(indiv) return (ROT_MES==='jun'?indiv.jun:indiv.jul);
+    if(indiv) return indiv[ROT_MES]||[];
   }
   // 2. Fallback: rotación grupal
   const g=(ROTACIONES[plant]||{})[grupo];
   if(!g) return null;
-  return (ROT_MES==='jun'?g.jun:g.jul);
+  return g[ROT_MES]||[];
 }
 /* superpone incidencias del trabajador sobre la rotación base */
 function corridaTrabajador(plant,ced){
@@ -2113,12 +2183,12 @@ function corridaTrabajador(plant,ced){
   const validCodes=['D','N','L','48/96'];  // 48/96 es código válido de trabajo
   const arr=[];
   for(let i=0;i<nd;i++) arr.push(base&&(validCodes.includes(base[i]))?base[i]:'?');
-  // aplicar incidencias que caigan en este mes (2026, mes jun=06/jul=07)
-  const mesNum=ROT_MES==='jun'?6:7;
+  // aplicar incidencias que caigan en este mes (2026)
+  const _mN=MES_NUM[ROT_MES]||7;
   INCIDENCIAS.filter(inc=>inc.cedula===ced && inc.plant===plant).forEach(inc=>{
     const d0=_pd(inc.desde), d1=_pd(inc.hasta);
     for(let dt=new Date(d0); dt<=d1; dt.setDate(dt.getDate()+1)){
-      if(dt.getFullYear()===2026 && (dt.getMonth()+1)===mesNum){
+      if(dt.getFullYear()===2026 && (dt.getMonth()+1)===_mN){
         arr[dt.getDate()-1]=inc.code;
       }
     }
@@ -2132,7 +2202,7 @@ function rcShow(plant,ced){
   const r=corridaTrabajador(plant,ced);
   if(!r){document.getElementById('rcCard').classList.remove('show');return;}
   const {w,arr,nd}=r;
-  const dow0=ROT_MES==='jun'?DOW_JUN:DOW_JUL;
+  const dow0=mesDOW(ROT_MES);
   const initials=(w.nombre||'?').split(' ').slice(0,2).map(s=>s[0]).join('');
   // conteos
   const nD=arr.filter(c=>c==='D'||c==='N'||c==='48/96').length;
@@ -2189,7 +2259,7 @@ function corte1630JunHTML(plant,ced){
   const colCode={R:'#B26A00',A:'#B3261E',V:'#B3261E',PNR:'#B3261E',S:'#B3261E',X:'#B3261E'};
   let celdas='';
   for(let d=16; d<=30; d++){
-    const dow=(DOW_JUN+(d-1))%7, wk=(dow===0||dow===6);
+    const dow=(mesDOW('jun')+(d-1))%7, wk=(dow===0||dow===6);
     const code=diasDesc[d];
     let bg='#ECECEC',col='#5a6672',txt='·',borde='';
     if(baseJun){ const b=baseJun[d-1];
@@ -2216,14 +2286,14 @@ function corte1630JunHTML(plant,ced){
 }
 
 /* --- exportar Excel --- */
-function mesLabel(){return ROT_MES==='jun'?'Junio 2026':'Julio 2026';}
+function mesLabel(){return mesNombre(ROT_MES);}
 function exportRotacion(){
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
   if(CURRENT_PLANT==='ambas'){toast('Selecciona Chocó o Isidora para exportar');return;}
   const rows=plantRows().filter(w=>w.estado==='activo');
   const nd=DIAS_MES[ROT_MES];
-  const mesNum=ROT_MES==='jun'?6:7;
-  const dow0=ROT_MES==='jun'?DOW_JUN:DOW_JUL;
+  const _mesNum=mesNum(ROT_MES);
+  const dow0=mesDOW(ROT_MES);
   const DOW3=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   const plantN=plant==='choco'?'Planta Chocó':'Mina Isidora';
   // título del período
@@ -2232,7 +2302,7 @@ function exportRotacion(){
   csv+=`Generado: ${new Date().toLocaleDateString('es-VE')}\n\n`;
   // encabezado con fecha completa por día: "01/07/2026 (Mar)"
   const dayHeaders=Array.from({length:nd},(_,i)=>{
-    const dd=String(i+1).padStart(2,'0'), mm=String(mesNum).padStart(2,'0');
+    const dd=String(i+1).padStart(2,'0'), mm=String(_mesNum).padStart(2,'0');
     const dow=DOW3[(dow0+i)%7];
     return `${dd}/${mm}/2026 (${dow})`;
   });
@@ -2249,8 +2319,8 @@ function exportRotacion(){
 function exportCorridaTrabajador(plant,ced){
   const r=corridaTrabajador(plant,ced);if(!r)return;
   const {w,arr,nd}=r;
-  const mesNum=ROT_MES==='jun'?6:7;
-  const dow0=ROT_MES==='jun'?DOW_JUN:DOW_JUL;
+  const _mesNum=mesNum(ROT_MES);
+  const dow0=mesDOW(ROT_MES);
   const DOWN=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const plantN=plant==='choco'?'Planta Chocó':'Mina Isidora';
   let csv=`CORRIDA DE ROTACION - ${w.nombre||ced}\n`;
@@ -2259,7 +2329,7 @@ function exportCorridaTrabajador(plant,ced){
   csv+='FECHA,DIA SEMANA,CODIGO,SIGNIFICADO\n';
   arr.forEach((c,i)=>{
     const dow=(dow0+i)%7;
-    const dd=String(i+1).padStart(2,'0'), mm=String(mesNum).padStart(2,'0');
+    const dd=String(i+1).padStart(2,'0'), mm=String(_mesNum).padStart(2,'0');
     let sig=({D:'Diurno',N:'Nocturno',L:'Libre','?':'Por definir'})[c]||(CODES[c]?CODES[c].label:c);
     csv+=[`${dd}/${mm}/2026`,DOWN[dow],c==='?'?'':c,`"${sig}"`].join(',')+'\n';
   });
@@ -2494,8 +2564,8 @@ function renderBioLoaded(){
       <button onclick="removeBioFile(${i})" title="Quitar">✕</button></div>`).join('');
   // días cubiertos
   const dates=bioDatesCovered();
-  const mesNum=ROT_MES==='jun'?6:7, nd=DIAS_MES[ROT_MES];
-  const covered=new Set(dates.filter(d=>+d.split('-')[1]===mesNum).map(d=>+d.split('-')[2]));
+  const _mesN=MES_NUM[ROT_MES]||mesNum(ROT_MES), nd=DIAS_MES[ROT_MES];
+  const covered=new Set(dates.filter(d=>+d.split('-')[1]===_mesN).map(d=>+d.split('-')[2]));
   let chips='';
   for(let i=1;i<=nd;i++) chips+=`<div class="bio-daychip ${covered.has(i)?'has':''}">${i}</div>`;
   document.getElementById('bioDaysCov').innerHTML=chips;
@@ -2512,8 +2582,8 @@ function runCruce(){
   if(!Object.keys(BIO_MARKS).length){toast('Sube al menos un archivo del biométrico');return;}
   if(CURRENT_PLANT==='ambas'){toast('Selecciona Chocó o Isidora para el cruce');return;}
   const plant=CURRENT_PLANT;
-  const nd=DIAS_MES[ROT_MES], mesNum=ROT_MES===  'jun'?6:7;
-  const covered=new Set(bioDatesCovered().filter(d=>+d.split('-')[1]===mesNum).map(d=>+d.split('-')[2]));
+  const nd=DIAS_MES[ROT_MES], _mN=MES_NUM[ROT_MES]||7;
+  const covered=new Set(bioDatesCovered().filter(d=>+d.split('-')[1]===_mN).map(d=>+d.split('-')[2]));
   if(!covered.size){toast('El biométrico no tiene marcas del mes seleccionado ('+mesLabel()+')');return;}
 
   const workers=plantRows().filter(w=>w.estado==='activo');
@@ -2531,7 +2601,7 @@ function runCruce(){
       const rot=base[dia-1];
       if(!['D','N','48/96'].includes(rot))continue;  // incluir 48/96 como día de trabajo
       evaluados++;
-      const dateStr=`2026-${String(mesNum).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+      const dateStr=`2026-${String(_mN).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
       const inc=incidenciaEnDia(plant,w.cedula,dateStr);
       if(inc){conInc++;continue;}
       const marks=(BIO_MARKS[w.cedula]||{})[dateStr];
@@ -2539,14 +2609,14 @@ function runCruce(){
       if(es4896){
         // Médicos 48/96: marcan a la ENTRADA (AM) y salen ~48h después (AM). Una marca cubre toda la guardia.
         const mm=BIO_MARKS[w.cedula]||{};
-        const has=(dd)=>{const x=mm[`2026-${String(mesNum).padStart(2,'0')}-${String(dd).padStart(2,'0')}`];return !!(x&&(x.am||x.pm));};
+        const has=(dd)=>{const x=mm[`2026-${String(_mN).padStart(2,'0')}-${String(dd).padStart(2,'0')}`];return !!(x&&(x.am||x.pm));};
         presente = has(dia) || has(dia-1) || has(dia+1);   // el día, el anterior (entrada) o el siguiente (salida)
       }else if(es21x7){
         presente = marks && (marks.am||marks.pm);          // 21X7: basta una
       }else if(rot==='D'){
         presente = marks && marks.am && marks.pm;           // AM + PM
       }else{ // N: PM ese día + AM del día siguiente
-        const next=`2026-${String(mesNum).padStart(2,'0')}-${String(dia+1).padStart(2,'0')}`;
+        const next=`2026-${String(_mN).padStart(2,'0')}-${String(dia+1).padStart(2,'0')}`;
         const mN=(BIO_MARKS[w.cedula]||{})[next];
         presente = marks && marks.pm && mN && mN.am;
       }
@@ -4621,8 +4691,8 @@ let MEMO_EXTRA_ID=1;
 function mesPagoLabel(){return (MES_NOMBRE[MES_PAGO]||'Julio 2026').toUpperCase();}
 // Mes de PRODUCCION de la 1era quincena = mes anterior al de pago (jul paga junio).
 function mesProduccionLabel(){
-  const prev={may:'abr',jun:'may',jul:'jun',ago:'jul'};
-  const nom={abr:'Abril 2026',may:'Mayo 2026',jun:'Junio 2026',jul:'Julio 2026',ago:'Agosto 2026'};
+  const prev={may:'abr',jun:'may',jul:'jun',ago:'jul',sep:'ago',oct:'sep',nov:'oct',dic:'nov'};
+  const nom={abr:'Abril 2026',may:'Mayo 2026',jun:'Junio 2026',jul:'Julio 2026',ago:'Agosto 2026',sep:'Septiembre 2026',oct:'Octubre 2026',nov:'Noviembre 2026',dic:'Diciembre 2026'};
   return (nom[prev[MES_PAGO]]||'Junio 2026').toUpperCase();
 }
 function mesPagoNormal(){return MES_NOMBRE[MES_PAGO]||'Julio 2026';}
@@ -4926,10 +4996,10 @@ function _corridaAOA(plant, mesKey){
 function _asistenciaGridAOA(plant, prevMes, curMes){
   const prevROT=ROT_MES;
   const ndPrev=DIAS_MES[prevMes]||30, ndCur=DIAS_MES[curMes]||31;
-  const mesN={jun:6,jul:7,may:5,ago:8};
-  const nom={jun:'JUNIO',jul:'JULIO',may:'MAYO',ago:'AGOSTO'};
+  const mesN={jun:6,jul:7,may:5,ago:8,sep:9,oct:10,nov:11,dic:12};
+  const nom={jun:'JUNIO',jul:'JULIO',may:'MAYO',ago:'AGOSTO',sep:'SEPTIEMBRE',oct:'OCTUBRE',nov:'NOVIEMBRE',dic:'DICIEMBRE'};
   const dowN=['dom','lun','mar','mié','jue','vie','sáb'];
-  const dow0=(m)=> m==='jun'?DOW_JUN:(m==='jul'?DOW_JUL:1);
+  const dow0=(m)=> mesDOW(m);
   // definición de días: mes anterior 16..fin, mes actual 1..fin
   const dd=[];
   for(let d=16; d<=ndPrev; d++) dd.push({m:prevMes, i:d-1, num:d, mn:mesN[prevMes]||6, dw:dowN[(dow0(prevMes)+d-1)%7]});
@@ -4961,9 +5031,9 @@ function _asistenciaGridAOA(plant, prevMes, curMes){
 function _incidenciasGridAOA(plant, mesKey, quincena){
   const prev=ROT_MES; ROT_MES=mesKey;
   const nd=DIAS_MES[mesKey]||30;
-  const mesNum=({jun:6,jul:7,may:5,ago:8})[mesKey]||6;
+  const mesNum=({jun:6,jul:7,may:5,ago:8,sep:9,oct:10,nov:11,dic:12})[mesKey]||6;
   const dowN=['dom','lun','mar','mié','jue','vie','sáb'];
-  const dow0 = mesKey==='jun'?DOW_JUN:(mesKey==='jul'?DOW_JUL:1);
+  const dow0 = mesDOW(mesKey);
   const unidad={2:'ADM',2.5:'CONEXOS',3:'OPERACIONES',3.5:'OPERACIONES'};
   const esBono=(quincena==='q1');
   const colBono=['B. PRODUCCIÓN (días excep.)','UNIDAD OPERACIONAL','ASIGNACIÓN Kg Au','TOTAL BONO (USD)','DÍAS A PAGAR','MONTO A PAGAR','MONTO REDONDEADO','ADSCRIPCIÓN','CUADRILLA','OBSERVACIÓN'];
@@ -5084,7 +5154,7 @@ function exportCaracas(){
   });
 
   // PRODUCCIÓN — corrida día por día (con incidencias encima)
-  let corridaMes=(quincena==='q1') ? ({jul:'jun',ago:'jul',jun:'may',may:'may'}[MES_PAGO]||'jun') : (MES_PAGO||'jul');
+  let corridaMes=(quincena==='q1') ? ({jul:'jun',ago:'jul',sep:'ago',oct:'sep',nov:'oct',dic:'nov',jun:'may',may:'may'}[MES_PAGO]||'jun') : (MES_PAGO||'jul');
   if(!DIAS_MES[corridaMes]) corridaMes=(quincena==='q1'?'jun':'jul');
   const C=_corridaAOA(plant,corridaMes);
   const wsP=XLSX.utils.aoa_to_sheet(C.aoa);
@@ -5098,7 +5168,7 @@ function exportCaracas(){
     const icols=[{wch:5},{wch:12},{wch:32},{wch:28}]; for(let d=0;d<IG.nd;d++)icols.push({wch:4}); wsI['!cols']=icols;
     XLSX.utils.book_append_sheet(wb, wsI, 'INCIDENCIAS');
   } else {
-    const prevM=({jul:'jun',ago:'jul',jun:'may'})[MES_PAGO]||'jun';
+    const prevM=({jul:'jun',ago:'jul',sep:'ago',oct:'sep',nov:'oct',dic:'nov',jun:'may'})[MES_PAGO]||'jun';
     const AG=_asistenciaGridAOA(plant, prevM, (MES_PAGO||'jul'));
     const wsA=XLSX.utils.aoa_to_sheet(AG.aoa);
     const acols=[{wch:12},{wch:32},{wch:28}]; for(let d=3;d<AG.ncols;d++)acols.push({wch:5}); wsA['!cols']=acols;
