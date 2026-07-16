@@ -1599,7 +1599,8 @@ function renderRotacion(){
     const info=groups[g];
     let seq=(ROT_MES==='jun'?info.jun:info.jul).slice(0,nd);
     while(seq.length<nd) seq.push('?');
-    const needsRev = seq.some(c=>c==='?') || !info.cycle;
+    const hasQ = seq.some(c=>c==='?');
+    const needsRev = hasQ; // solo revisar si hay días sin definir
     const days=seq.map((c,i)=>{
       const dow=(dow0+i)%7;
       const wk=(dow===0||dow===6);
@@ -1637,7 +1638,6 @@ function renderRotacion(){
       const motivos=[];
       if(jq) motivos.push(jq+' hueco'+(jq>1?'s':'')+' junio');
       if(lq) motivos.push(lq+' hueco'+(lq>1?'s':'')+' julio');
-      if(!info.cycle) motivos.push('sin ciclo');
       if(motivos.length) rev.push({g, count:info.count, motivos}); else okc++;
     });
     const indivs=(typeof ROT_INDIVIDUAL!=='undefined')?(ROT_INDIVIDUAL[plant]||[]):[];
