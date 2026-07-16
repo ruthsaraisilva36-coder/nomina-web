@@ -1578,6 +1578,10 @@ function rotGroupsFor(){
 function initRotMes(){
   document.getElementById('rotMes').addEventListener('change',e=>{ROT_MES=e.target.value;renderRotacion();});
 }
+function scrollToRotGroup(g){
+  const el=document.getElementById('rotg_'+g.replace(/\s+/g,'_'));
+  if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.outline='3px solid var(--au)';setTimeout(()=>el.style.outline='',2000);}
+}
 function renderRotacion(){
   if(CURRENT_PLANT==='ambas'){
     document.getElementById('rotGroups').innerHTML=
@@ -1606,7 +1610,7 @@ function renderRotacion(){
           ${['D','N','L','?'].map(o=>`<option ${o===c?'selected':''}>${o}</option>`).join('')}
         </select></div>`;
     }).join('');
-    return `<div class="rot-group">
+    return `<div class="rot-group" id="rotg_${g.replace(/\s+/g,'_')}">
       <div class="rot-group-head">
         <span class="gname">${g}</span>
         <span class="gcount">${info.count} trab.</span>
@@ -1650,7 +1654,7 @@ function renderRotacion(){
     if(rev.length){
       html+='<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Cuadrillas por completar (haz clic en el grupo abajo para editar sus días):</div>';
       html+='<div style="display:flex;flex-direction:column;gap:5px">'+rev.map(r=>
-        `<div style="font-size:12.5px;background:var(--bad-bg);border-radius:8px;padding:6px 10px">⚠ <b>${r.g}</b> <span style="color:var(--muted)">(${r.count} trab.)</span> — ${r.motivos.join(' · ')}</div>`).join('')+'</div>';
+        `<div style="font-size:12.5px;background:var(--bad-bg);border-radius:8px;padding:6px 10px;cursor:pointer" onclick="scrollToRotGroup('${r.g.replace(/'/g,"\\'")}')">⚠ <b>${r.g}</b> <span style="color:var(--muted)">(${r.count} trab.)</span> — ${r.motivos.join(' · ')} <small style="color:var(--muted);margin-left:8px">▼ clic para ir al grupo</small></div>`).join('')+'</div>';
     }
     if(indivRev.length){
       html+='<div style="font-size:12px;color:var(--muted);margin:10px 0 6px">Trabajadores con rotación individual incompleta:</div>';
