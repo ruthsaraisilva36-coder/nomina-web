@@ -181,6 +181,34 @@
     font-size:12.5px;color:#6b4e12;display:flex;gap:10px;margin-bottom:18px}
   .info-note .ic{font-size:16px}
 
+  /* ---- descuento 16-30 compact ---- */
+  .desc-card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden;transition:all .2s}
+  .desc-card-head{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none}
+  .desc-card-head:hover{background:var(--paper)}
+  .desc-card-head .dch-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+  .desc-card-head.open .dch-arrow{transform:rotate(90deg)}
+  .desc-card-head .dch-name{font-weight:700;font-size:13.5px;color:var(--slate);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .desc-card-head .dch-ced{font-size:11.5px;color:var(--muted);flex-shrink:0}
+  .desc-card-head .dch-chips{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap}
+  .desc-chip{font-size:11px;font-weight:700;padding:2px 9px;border-radius:16px}
+  .desc-chip.dias{background:var(--paper-2);color:var(--slate)}
+  .desc-chip.monto{background:var(--bad-bg);color:var(--bad)}
+  .desc-chip.dup{background:#FFEEBA;color:#856404;font-size:10px}
+  .desc-card-body{display:none;padding:0 16px 14px;border-top:1px solid var(--paper-2)}
+  .desc-card-body.open{display:block}
+  .desc-day-grid{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+  .desc-day{width:42px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .desc-day .dd-n{font-size:9.5px;color:var(--muted);font-weight:700}
+  .desc-day .dd-cell{width:38px;height:30px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:800}
+  .desc-day .dd-cell.desc{background:#F6DEDA;color:var(--bad);border:2px solid var(--bad)}
+  .desc-day .dd-cell.dup{background:#FFEEBA;color:#856404;border:2px dashed #856404;text-decoration:line-through;opacity:.65}
+  .desc-day .dd-cell.ok{background:#ECECEC;color:#888}
+  .desc-dup-note{font-size:11.5px;color:#856404;background:#FFF8E1;border:1px solid #FFEEBA;border-radius:8px;padding:7px 11px;margin-top:8px;display:flex;align-items:center;gap:6px}
+  .desc-summary-bar{display:flex;align-items:center;gap:14px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:14px;flex-wrap:wrap}
+  .desc-summary-bar .dsb-n{font-size:22px;font-weight:800;color:var(--slate)}
+  .desc-summary-bar .dsb-l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:600}
+  .desc-summary-bar .dsb-sep{width:1px;height:30px;background:var(--line)}
+
   .view{display:none}
   .view.active{display:block;animation:fade .25s}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -923,15 +951,24 @@
       </section>
       <!-- DESCUENTO 16-30 -->
       <section class="view" id="view-descuento1630">
-        <div class="info-note"><span class="ic">➖</span>
-          <div id="desc1630Info">Personal con <b>descuento 16–30 del mes anterior</b> para la 2da quincena (asistencia+alimentación no trabajadas, a $3,33/día). Se calcula de las incidencias del mes anterior ya cargadas y <b>respeta los autorizados por gerencia</b>. Puedes filtrar y exportar a Excel.</div>
+        <div class="info-note" style="margin-bottom:12px"><span class="ic">➖</span>
+          <div id="desc1630Info">Descuento 16–30 · $5,00/día</div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-          <input id="desc1630Search" type="text" placeholder="Buscar por cédula o nombre…" style="flex:1;min-width:220px;margin:0;padding:9px 12px" oninput="renderDescuento1630()">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+          <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Mes:</label>
+          <select id="desc1630Mes" onchange="cambiarMesDesc1630(this.value)" style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;font-weight:600">
+            <option value="jun">Junio 2026</option>
+            <option value="jul">Julio 2026</option>
+            <option value="ago">Agosto 2026</option>
+            <option value="sep">Septiembre 2026</option>
+            <option value="oct">Octubre 2026</option>
+            <option value="nov">Noviembre 2026</option>
+          </select>
+          <input id="desc1630Search" type="search" placeholder="Buscar…" style="flex:1;min-width:140px;margin:0;padding:9px 12px" oninput="renderDescuento1630()">
           <button class="btn btn-au btn-sm" style="width:auto" onclick="recalcular1630()" id="btn1630Recalc">⟳ Recalcular</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="addArrastre()">+ Manual</button>
+          <button class="btn btn-ghost btn-sm" style="width:auto" onclick="exportDescuento1630()">⇩ Excel</button>
           <button class="btn btn-ghost btn-sm" style="width:auto" onclick="clearArrastres()">Limpiar</button>
-          <button class="btn btn-ghost btn-sm" style="width:auto" onclick="exportDescuento1630()">⇩ Exportar Excel</button>
           <span class="count" id="desc1630Resumen" style="margin-left:auto"></span>
         </div>
         <div id="desc1630List"></div>
@@ -1239,7 +1276,7 @@ document.querySelectorAll('#plantSwitch button').forEach(b=>{
 
 /* ---------- BOOT ---------- */
 function boot(){
-  renderDash(); buildRotFilter(); initIncidencias(); initRotMes(); initRotConsulta(); initBio(); initCert(); initCalc();
+  renderDash(); buildRotFilter(); initIncidencias(); initRotMes(); initRotConsulta(); initBio(); initCert(); initCalc(); initDesc1630Mes();
   // Cargar incidencias precargadas (junio Q1 + julio Q2)
   // Limpiar SOLO julio de Firebase (sin tocar junio → Q1 protegida)
   // y cargar las precargadas correctas
@@ -1274,6 +1311,7 @@ function boot(){
     ARRASTRES.length=0;
     ARRASTRES_PRECARGADOS.forEach(a=>{
       a.id=ARRASTRE_ID++;
+      if(!a.diasDup) a.diasDup={};  // compatibilidad con formato nuevo
       ARRASTRES.push(a);
     });
     console.log('Arrastres junio 16-30 forzados del Excel: '+ARRASTRES.length+' trabajadores');
@@ -4187,10 +4225,37 @@ function renderRetroList(){
    del 16 al 30 ya se pagaron de más y se descuentan en la 2da quincena del
    mes siguiente. Solo Asistencia + Alimentación ($50/30 + $100/30 = $5,000/día).
    El IPE nunca entra: del 16 al 30 hay máx. 15 días, jamás llega al umbral de 16. */
-let ARRASTRES=[]; // {id,plant,ced,nombre,dias:{16:'R',19:'A'},monto,mesOrigen,quien,cuando}
+let ARRASTRES=[]; // {id,plant,ced,nombre,dias:{16:'R',19:'A'},monto,mesOrigen,quien,cuando,diasDup:{}}
 let ARRASTRE_ID=1;
 const VALOR_DIA_1630=Math.trunc((50/30+100/30)*1000)/1000; // 5.000 USD/día (Asist. $50 + Alim. $100 divisa, sin IPE)
 const CODES_DESC_1630=['R','V','A','PNR','S','X']; // mismos que descuentan en 2da quincena
+
+/* ===== HISTORIAL ANTI-DUPLICACIÓN =====
+   Registra cada día que ya fue descontado a un trabajador, con el mes de pago en que se aplicó.
+   Formato: { "plant_ced": { "mesOrigen_dia": mesPago } }
+   Ej: { "choco_12345678": { "jun_17": "jul", "jun_22": "jul" } }
+   Cuando se recalcula, si el día ya aparece en el historial, se marca como duplicado y NO se descuenta. */
+let DESC_HISTORIAL={};
+
+/* Registra los días descontados actuales en el historial */
+function registrarEnHistorial(){
+  ARRASTRES.forEach(a=>{
+    const key=a.plant+'_'+normCed(a.ced);
+    if(!DESC_HISTORIAL[key]) DESC_HISTORIAL[key]={};
+    Object.keys(a.dias||{}).forEach(d=>{
+      const dKey=(a.mesOrigen||'').replace(/[^a-záéíóúñ]/gi,'').toLowerCase().slice(0,3)+'_'+d;
+      if(!a.diasDup || !a.diasDup[d]){
+        DESC_HISTORIAL[key][dKey]=MES_PAGO||ROT_MES;
+      }
+    });
+  });
+}
+/* Verifica si un día ya fue descontado en un período anterior */
+function diaYaDescontado(plant,ced,mesOrigenKey,dia){
+  const key=plant+'_'+normCed(ced);
+  const dKey=mesOrigenKey+'_'+dia;
+  return DESC_HISTORIAL[key] && DESC_HISTORIAL[key][dKey] ? DESC_HISTORIAL[key][dKey] : null;
+}
 
 function arrastreDe(plant,ced){
   // el arrastre siempre aplica a la 2da quincena y siempre resta
@@ -4208,18 +4273,51 @@ function excluidoDeQ2(ced){
   const cedN=normCed(ced);
   return ['seguridad'].some(g=>(GRUPOS_FIJOS[g]||[]).some(x=>normCed(x.cedula)===cedN));
 }
-/* Calcula el descuento 16-30 del MES ANTERIOR a ROT_MES directamente desde las
-   incidencias ya cargadas (códigos que descuentan, excluyendo autorizados por gerencia).
-   Ej: ROT_MES='jul' → descuenta incidencias del 16-30 de junio.
-       ROT_MES='ago' → descuenta incidencias del 16-30 de julio. */
+/* Calcula el descuento 16-30 del mes seleccionado en la vista Descuento 16-30.
+   Por defecto usa el mes anterior a ROT_MES, pero el usuario puede cambiarlo
+   con el selector de mes en la vista. */
+let DESC_1630_MES=null; // null = automático (mes anterior a ROT_MES)
+
+function cambiarMesDesc1630(mes){
+  DESC_1630_MES=mes;
+  // Limpiar arrastres de la planta actual para recalcular con el nuevo mes
+  if(CURRENT_PLANT!=='ambas'){
+    ARRASTRES=ARRASTRES.filter(a=>a.plant!==CURRENT_PLANT);
+  }
+  renderDescuento1630();
+}
+function initDesc1630Mes(){
+  // Sincronizar el selector con el mes actual
+  const sel=document.getElementById('desc1630Mes');
+  if(sel){
+    const mesAnt=mesDescuento1630();
+    sel.value=mesAnt.key;
+  }
+}
+function mesDescuento1630(){
+  // Si hay un mes seleccionado manualmente, usarlo
+  if(DESC_1630_MES && _MESES_INFO[DESC_1630_MES]){
+    return {key:DESC_1630_MES, num:MES_NUM[DESC_1630_MES]||6, nombre:mesNombre(DESC_1630_MES).replace(/ 2026/,'')};
+  }
+  // Por defecto: mes anterior a ROT_MES
+  const prev=mesPrev(ROT_MES);
+  if(!prev) return {key:'jun',num:6,nombre:'Junio'};
+  return {key:prev, num:MES_NUM[prev]||6, nombre:mesNombre(prev).replace(/ 2026/,'')};
+}
+/* mesAnteriorDesc1630 sigue existiendo para compatibilidad con Q2 y otros cálculos,
+   pero ahora la vista de Descuento 16-30 usa mesDescuento1630() */
 function mesAnteriorDesc1630(){
   const prev=mesPrev(ROT_MES);
   if(!prev) return {key:'jun',num:6,nombre:'Junio'};
   return {key:prev, num:MES_NUM[prev]||6, nombre:mesNombre(prev).replace(/ 2026/,'')};
 }
 function calcularDescuento1630(plant){
+  /* Antes de borrar, registrar los descuentos actuales en el historial para que
+     el mes siguiente sepa que esos días ya fueron cobrados */
+  registrarEnHistorial();
   ARRASTRES=ARRASTRES.filter(a=>a.plant!==plant);
-  const mesAnt=mesAnteriorDesc1630();
+  const mesAnt=mesDescuento1630();
+  const mesKey=mesAnt.nombre.replace(/[^a-záéíóúñ]/gi,'').toLowerCase().slice(0,3);
   const byW={};
   INCIDENCIAS.filter(i=>i.plant===plant && CODES_DESC_1630.includes(i.code) && !i.autorizado && !excluidoDeQ2(i.cedula)).forEach(inc=>{
     const cedN=normCed(inc.cedula);
@@ -4233,10 +4331,32 @@ function calcularDescuento1630(plant){
   });
   Object.entries(byW).forEach(([cedN,dias])=>{
     const w=DATA_PERSONAL[plant].find(x=>normCed(x.cedula)===cedN);
-    const nDias=Object.keys(dias).length;
-    if(nDias>=15) return; // ausente TODO el período → no cobró → nada que descontar
-    ARRASTRES.push({id:ARRASTRE_ID++,plant,ced:w?w.cedula:cedN,nombre:w?w.nombre:cedN,dias,
-      monto:montoArrastre(nDias),mesOrigen:mesAnt.nombre+' (16-'+DIAS_MES[mesAnt.key]+')',
+    const allDias=Object.keys(dias);
+    const diasDup={};
+    const diasNuevos={};
+    allDias.forEach(d=>{
+      const prevPago=diaYaDescontado(plant,cedN,mesKey,d);
+      if(prevPago){
+        diasDup[d]={code:dias[d],pagadoEn:prevPago};
+      } else {
+        diasNuevos[d]=dias[d];
+      }
+    });
+    const nDiasEfectivos=Object.keys(diasNuevos).length;
+    const nDiasTodos=allDias.length;
+    if(nDiasTodos>=15) return;
+    if(nDiasEfectivos===0 && Object.keys(diasDup).length>0){
+      ARRASTRES.push({id:ARRASTRE_ID++,plant,ced:w?w.cedula:cedN,nombre:w?w.nombre:cedN,
+        dias,diasDup,diasNuevos:{},monto:0,
+        mesOrigen:mesAnt.nombre+' (16-'+(DIAS_MES[mesAnt.key]||30)+')',
+        quien:(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)?CURRENT_USER.name:'sistema',
+        cuando:(typeof nowStamp==='function')?nowStamp():'',
+        _todoDup:true});
+      return;
+    }
+    ARRASTRES.push({id:ARRASTRE_ID++,plant,ced:w?w.cedula:cedN,nombre:w?w.nombre:cedN,
+      dias:diasNuevos,diasDup,monto:montoArrastre(nDiasEfectivos),
+      mesOrigen:mesAnt.nombre+' (16-'+(DIAS_MES[mesAnt.key]||30)+')',
       quien:(typeof CURRENT_USER!=='undefined'&&CURRENT_USER)?CURRENT_USER.name:'sistema',
       cuando:(typeof nowStamp==='function')?nowStamp():''});
   });
@@ -4244,11 +4364,14 @@ function calcularDescuento1630(plant){
 }
 function recalcular1630(){
   if(CURRENT_PLANT==='ambas'){toast('Selecciona Chocó o Isidora');return;}
-  const mesAnt=mesAnteriorDesc1630();
+  const mesAnt=mesDescuento1630();
   const n=calcularDescuento1630(CURRENT_PLANT);
+  const plant=CURRENT_PLANT;
+  const totDup=ARRASTRES.filter(a=>a.plant===plant).reduce((s,a)=>s+Object.keys(a.diasDup||{}).length,0);
   if(typeof renderArrastreList==='function')renderArrastreList();
+  if(typeof renderDescuento1630==='function')renderDescuento1630();
   if(CALC_RESULT)runCalculo();
-  toast('Descuento 16-30 ('+mesAnt.nombre+') calculado desde incidencias: '+n+' trabajadores');
+  toast('Descuento 16-30 ('+mesAnt.nombre+'): '+n+' trabajadores'+(totDup?' · '+totDup+' día(s) ya cobrados antes (no se repiten)':''));
 }
 
 /* Importa la hoja PRODUCCION de la nómina de 1era quincena y extrae, por
@@ -4444,7 +4567,7 @@ function importArrastreProduccion(fileList){
         const w=findWorker(plant,ced);
         const monto=montoArrastre(nd);
         ARRASTRES.push({id:ARRASTRE_ID++,plant,ced,nombre:w?w.nombre:(String(row[cedCol+1]||'').trim()),
-          dias,monto,mesOrigen:mesAnteriorDesc1630().nombre,quien:CURRENT_USER.name,cuando:nowStamp()});
+          dias,monto,mesOrigen:mesDescuento1630().nombre,quien:CURRENT_USER.name,cuando:nowStamp()});
         nTrab++; nDiasTot+=nd;
       }
       toast(`Descuento 16-30 importado · ${nTrab} trabajadores · ${nDiasTot} días`);
@@ -4461,7 +4584,7 @@ function addArrastre(){
   const ced=prompt('Cédula del trabajador:');if(!ced)return;
   const cedL=ced.replace(/\D/g,'');
   const w=findWorker(plant,cedL);
-  const mesAnt=mesAnteriorDesc1630();
+  const mesAnt=mesDescuento1630();
   const maxDia=DIAS_MES[mesAnt.key]||30;
   const entrada=prompt('Días ausentes del 16 al '+maxDia+' de '+mesAnt.nombre.toLowerCase()+' con su código, ej: 16=R,17=R,19=A\n(o solo los días 16,17,19 y se asume A):','');
   if(entrada===null)return;
@@ -4495,48 +4618,116 @@ function clearArrastres(){
 }
 function diasListArr(a){return Object.keys(a.dias||{}).map(d=>+d).sort((x,y)=>x-y);}
 
-/* ===== Vista dedicada: Descuento 16-30 (junio) ===== */
+/* ===== Vista dedicada: Descuento 16-30 — tabla simple y limpia ===== */
 function renderDescuento1630(){
   const cont=document.getElementById('desc1630List'); if(!cont)return;
   const res=document.getElementById('desc1630Resumen');
-  const mesAnt=mesAnteriorDesc1630();
+  const mesAnt=mesDescuento1630();
   const mesNumStr=String(mesAnt.num).padStart(2,'0');
+  const maxDia=DIAS_MES[mesAnt.key]||30;
 
-  // Actualizar textos dinámicos
   const infoEl=document.getElementById('desc1630Info');
-  if(infoEl) infoEl.innerHTML=`Personal con <b>descuento 16–${DIAS_MES[mesAnt.key]||30} de ${mesAnt.nombre.toLowerCase()}</b> para la 2da quincena (asistencia+alimentación no trabajadas en la 2da mitad de ${mesAnt.nombre.toLowerCase()}, a $3,33/día). Se calcula de las incidencias de ${mesAnt.nombre.toLowerCase()} ya cargadas y <b>respeta los autorizados por gerencia</b>. Puedes filtrar y exportar a Excel.`;
+  if(infoEl) infoEl.innerHTML=`Descuento 16–${maxDia} de <b>${mesAnt.nombre.toLowerCase()}</b> · $${VALOR_DIA_1630.toFixed(2)}/día · Días ya descontados antes <b>no se repiten</b>.`;
   const btnRec=document.getElementById('btn1630Recalc');
-  if(btnRec) btnRec.textContent='⟳ Recalcular desde '+mesAnt.nombre.toLowerCase();
-  // Título de la vista
+  if(btnRec) btnRec.textContent='⟳ Recalcular';
   const titleEl=document.getElementById('viewTitle');
   if(titleEl && titleEl.textContent.includes('Descuento')) titleEl.textContent='Descuento 16-30 ('+mesAnt.nombre.toLowerCase()+')';
 
   if(CURRENT_PLANT==='ambas'){
-    cont.innerHTML='<div class="info-note"><span class="ic">⚠</span><div>El descuento se maneja por planta. Cambia arriba a <b>Chocó</b> o <b>Isidora</b>.</div></div>';
+    cont.innerHTML='<div class="info-note"><span class="ic">⚠</span><div>Cambia a <b>Chocó</b> o <b>Isidora</b>.</div></div>';
     if(res)res.textContent=''; return;
   }
   const plant=CURRENT_PLANT;
   if(!ARRASTRES.some(a=>a.plant===plant)) calcularDescuento1630(plant);
   const q=(document.getElementById('desc1630Search').value||'').toLowerCase().trim();
-  const all=ARRASTRES.filter(a=>a.plant===plant);
+  const all=ARRASTRES.filter(a=>a.plant===plant && !a._todoDup);
   const totMonto=Math.trunc(all.reduce((s,a)=>s+a.monto,0)*100)/100;
+  const totDupDias=ARRASTRES.filter(a=>a.plant===plant).reduce((s,a)=>s+Object.keys(a.diasDup||{}).length,0);
   let rows=all;
   if(q) rows=all.filter(a=>((a.nombre||'')+' '+a.ced).toLowerCase().includes(q));
-  if(res)res.innerHTML=`${all.length} trabajadores · total <b style="color:var(--bad)">${fmt2(totMonto)}</b> USD`;
+
+  if(res)res.innerHTML=`${all.length} trab. · <b style="color:var(--bad)">${fmt2(totMonto)}</b>`
+    +(totDupDias?' · <span style="color:#856404">'+totDupDias+' día(s) omitidos</span>':'');
+
   if(!rows.length){
-    cont.innerHTML='<div class="bio-empty"><div class="big">✓</div><h3 style="color:var(--slate)">Sin descuentos</h3><p>No hay personal con descuento 16–'+(DIAS_MES[mesAnt.key]||30)+' de '+mesAnt.nombre.toLowerCase()+' en esta planta'+(q?' que coincida con el filtro':'')+'.</p></div>';
+    cont.innerHTML='<div class="bio-empty"><div class="big">✓</div><h3 style="color:var(--slate)">Sin descuentos</h3><p>No hay descuentos para esta planta'+(q?' con ese filtro':'')+'.</p></div>';
     return;
   }
-  cont.innerHTML='<table class="memo-table" style="margin:0"><thead><tr><th>#</th><th>Trabajador</th><th>Cédula</th><th>Días 16–'+(DIAS_MES[mesAnt.key]||30)+' '+mesAnt.nombre.toLowerCase()+' (código)</th><th>Nº días</th><th>Descuento</th></tr></thead><tbody>'+
-    rows.slice().sort((a,b)=>a.monto-b.monto).map((a,i)=>{const ds=diasListArr(a);
-      return `<tr>
-        <td>${i+1}</td>
-        <td><b>${a.nombre||a.ced}</b></td>
-        <td>${a.ced}</td>
-        <td style="font-size:12px">${ds.map(d=>d+'/'+mesNumStr+'('+a.dias[d]+')').join(', ')||'—'}</td>
-        <td style="text-align:center">${ds.length}</td>
-        <td class="money" style="color:var(--bad)">${fmt2(a.monto)}</td>
-      </tr>`;}).join('')+'</tbody></table>';
+
+  const sorted=rows.slice().sort((a,b)=>a.monto-b.monto);
+  const readonly=CURRENT_USER.can==='read';
+
+  /* Calcular cuánto cobró cada trabajador en Q2 del mismo mes de descuento.
+     Ej: descuento junio 16-30 → mostrar cobro Q2 junio.
+         descuento julio 16-30 → mostrar cobro Q2 julio. */
+  function diasDescMes(plant,ced,mesN){
+    const cedN=normCed(ced);
+    const descQ2=['R','V','A','PNR','S','X'];
+    const diasSet=new Set();
+    INCIDENCIAS.filter(i=>i.plant===plant&&normCed(i.cedula)===cedN).forEach(inc=>{
+      if(!descQ2.includes(inc.code)||inc.autorizado)return;
+      const d0=_pd(inc.desde),d1=_pd(inc.hasta);
+      for(let dt=new Date(d0);dt<=d1;dt.setDate(dt.getDate()+1)){
+        if(dt.getFullYear()===2026&&(dt.getMonth()+1)===mesN) diasSet.add(dt.getDate());
+      }
+    });
+    if(CRUCE_RESULT&&CRUCE_RESULT.plant===plant){
+      CRUCE_RESULT.ausencias.filter(a=>normCed(a.ced)===cedN).forEach(a=>{
+        if(a.fecha){const f=_pd(a.fecha);if(f.getFullYear()!==2026||(f.getMonth()+1)!==mesN)return;}
+        const ci=CERT_ITEMS.find(it=>it.id==='A_'+plant+'_'+cedN);
+        if(ci&&ci.status==='just')return;
+        diasSet.add(a.dia);
+      });
+    }
+    return diasSet.size;
+  }
+  function cobroQ2(plant,ced){
+    const w=findWorker(plant,ced); if(!w) return null;
+    const desc=diasDescMes(plant,ced,mesAnt.num);
+    const dp=Math.max(0,30-desc);
+    const asist=Math.trunc(50/30*dp*100)/100;
+    const alim=Math.trunc(100/30*dp*100)/100;
+    const ipe=(w.ipe||0);
+    return Math.round(asist+alim+ipe);
+  }
+  const mesQ2Label='Q2 '+mesAnt.nombre.toLowerCase();
+
+  const tableRows=sorted.map((a,i)=>{
+    const dsNuevos=Object.keys(a.dias||{}).map(d=>+d).sort((x,y)=>x-y);
+    const dsDup=Object.keys(a.diasDup||{}).map(d=>+d).sort((x,y)=>x-y);
+    const diasTxt=dsNuevos.map(d=>`<span style="background:#F6DEDA;color:var(--bad);padding:1px 5px;border-radius:4px;font-size:11px;font-weight:700">${d}/${mesNumStr}(${a.dias[d]})</span>`).join(' ');
+    const dupTxt=dsDup.length?dsDup.map(d=>`<s style="color:#856404;font-size:11px">${d}/${mesNumStr}</s>`).join(' '):'';
+    const cobro=cobroQ2(plant,a.ced);
+    const cobroTxt=cobro===null?'—':cobro>0?'<span style="color:var(--ok);font-weight:700">$'+fmt(cobro)+'</span>':'<span style="color:var(--muted)">$0</span>';
+    return `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><b>${a.nombre||a.ced}</b></td>
+      <td>${a.ced}</td>
+      <td>${diasTxt}</td>
+      <td style="text-align:center">${dupTxt||'—'}</td>
+      <td style="text-align:center;font-weight:700">${dsNuevos.length}</td>
+      <td class="money">${cobroTxt}</td>
+      <td class="money" style="color:var(--bad)">${fmt2(a.monto)}</td>
+      <td>${readonly?'':`<button class="icon-btn danger" onclick="delArrastre(${a.id})" title="Quitar">✕</button>`}</td>
+    </tr>`;
+  }).join('');
+
+  cont.innerHTML=`<div class="table-wrap"><div class="tscroll">
+    <table class="memo-table" style="margin:0">
+      <thead><tr>
+        <th>#</th><th>Trabajador</th><th>Cédula</th>
+        <th>Días que descuentan</th><th>Ya cobrados</th>
+        <th>Nº</th><th>Cobró ${mesQ2Label}</th><th>Descuento</th><th></th>
+      </tr></thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot><tr class="tot">
+        <td></td><td></td><td></td><td></td><td></td>
+        <td style="text-align:center">${sorted.reduce((s,a)=>s+Object.keys(a.dias||{}).length,0)}</td>
+        <td></td>
+        <td class="money">${fmt2(totMonto)}</td><td></td>
+      </tr></tfoot>
+    </table>
+  </div></div>`;
 }
 function exportDescuento1630(){
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
@@ -4544,7 +4735,7 @@ function exportDescuento1630(){
   if(!ARRASTRES.some(a=>a.plant===plant)) calcularDescuento1630(plant);
   const rows=ARRASTRES.filter(a=>a.plant===plant);
   if(!rows.length){toast('No hay descuentos 16-30 para exportar');return;}
-  const mesAnt=mesAnteriorDesc1630();
+  const mesAnt=mesDescuento1630();
   const mesNumStr=String(mesAnt.num).padStart(2,'0');
   let csv='CEDULA,TRABAJADOR,PLANTA,DIAS 16-'+(DIAS_MES[mesAnt.key]||30)+' ('+mesAnt.nombre.toUpperCase()+'),NUM DIAS,VALOR DIA USD,DESCUENTO USD\n';
   rows.slice().sort((a,b)=>a.monto-b.monto).forEach(a=>{const ds=diasListArr(a);
@@ -4564,29 +4755,27 @@ function toggleArrastreList(){
 function renderArrastreList(){
   const box=document.getElementById('arrastreList');if(!box)return;
   const plant=CURRENT_PLANT==='isidora'?'isidora':'choco';
-  const rows=ARRASTRES.filter(a=>a.plant===plant);
-  if(!rows.length){box.innerHTML='<span style="color:var(--muted);font-size:12.5px">Sin descuentos 16-30 cargados. Importa la hoja PRODUCCIÓN de la 1era quincena.</span>';return;}
+  const rows=ARRASTRES.filter(a=>a.plant===plant && !a._todoDup);
+  if(!rows.length){box.innerHTML='<span style="color:var(--muted);font-size:12.5px">Sin descuentos 16-30.</span>';return;}
   const totMonto=Math.trunc(rows.reduce((s,a)=>s+a.monto,0)*100)/100;
+  const totDup=ARRASTRES.filter(a=>a.plant===plant).reduce((s,a)=>s+Object.keys(a.diasDup||{}).length,0);
   const toggleIcon=_arrastreListExpanded?'▼':'▶';
-  const toggleLabel=_arrastreListExpanded?'Ocultar detalle':'Ver detalle';
-  const tableDisplay=_arrastreListExpanded?'':'display:none';
-  box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--card);border-radius:8px;border:1px solid var(--border)">
-      <span style="font-size:13px;font-weight:600;color:var(--bad)">${rows.length} descuentos</span>
-      <span style="color:var(--muted);font-size:12px">·</span>
-      <span style="font-size:13px">Total: <b style="color:var(--bad)">${fmt2(totMonto)}</b> USD</span>
-      <button class="btn btn-ghost btn-sm" onclick="toggleArrastreList()" style="font-size:12px">${toggleIcon} ${toggleLabel}</button>
+  box.innerHTML=`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#fff;border-radius:10px;border:1px solid var(--line);flex-wrap:wrap">
+      <span style="font-size:13px"><b style="color:var(--bad)">${rows.length}</b> descuentos · <b style="color:var(--bad)">${fmt2(totMonto)}</b></span>
+      ${totDup?'<span style="font-size:11.5px;color:#856404">· '+totDup+' día(s) omitidos</span>':''}
+      <button class="btn btn-ghost btn-sm" onclick="toggleArrastreList()" style="font-size:11px;margin-left:auto">${toggleIcon} Detalle</button>
     </div>
-    <div style="${tableDisplay};margin-top:8px">
-    <table class="memo-table" style="margin:0"><thead><tr><th>Trabajador</th><th>Días 16-30 junio (código)</th><th>Nº</th><th>Monto</th><th></th></tr></thead><tbody>`+
+    ${_arrastreListExpanded?`<div style="margin-top:6px"><table class="memo-table" style="margin:0;font-size:12px"><thead><tr><th>Trabajador</th><th>Días</th><th>Monto</th><th></th></tr></thead><tbody>`+
     rows.map(a=>{
-      const ds=diasListArr(a);
+      const dsN=diasListArr(a);
+      const mesAnt=mesDescuento1630();
+      const mn=String(mesAnt.num).padStart(2,'0');
       return `<tr>
-      <td><b>${a.nombre||a.ced}</b><br><small style="color:var(--muted)">C.I. ${a.ced}</small></td>
-      <td style="font-size:12px">${ds.map(d=>d+'/06('+a.dias[d]+')').join(', ')||'—'}</td>
-      <td style="text-align:center">${ds.length}</td>
+      <td>${a.nombre||a.ced}<br><small style="color:var(--muted)">${a.ced}</small></td>
+      <td style="font-size:11px">${dsN.map(d=>d+'/'+mn+'('+a.dias[d]+')').join(', ')||'—'}</td>
       <td class="money" style="color:var(--bad)">${fmt2(a.monto)}</td>
       <td><button class="icon-btn danger" onclick="delArrastre(${a.id})" title="Quitar">✕</button></td>
-    </tr>`;}).join('')+'</tbody></table></div>';
+    </tr>`;}).join('')+'</tbody></table></div>':''}`;
 }
 
 function initCalc(){
@@ -4605,6 +4794,24 @@ function initCalc(){
 /* días que descuentan según quincena */
 /* normaliza cédula a texto de solo dígitos, para comparar sin importar tipo/formato */
 function normCed(c){return String(c==null?'':c).replace(/\D/g,'');}
+
+/* Determina si un trabajador debe incluirse en el cálculo según la quincena.
+   Q1 paga la producción del MES ANTERIOR: un egresado durante el mes de pago
+   (o después) todavía estaba activo en el mes de producción → debe cobrar Q1.
+   Q2 paga asistencia/IPE del MES ACTUAL: solo trabajadores activos. */
+function esActivoParaCalculo(w, quincena){
+  if(w.estado==='activo') return true;
+  if(quincena==='q1' && w.estado==='egresado' && w.fechaEgreso){
+    var mesPagoNum=MES_NUM[MES_PAGO]||7;
+    var mesProduccion=mesPagoNum-1||12;
+    var fechaEgreso=_pd(w.fechaEgreso);
+    var mesEgreso=fechaEgreso.getMonth()+1;
+    // Incluir si fue egresado durante o después del mes de producción
+    return mesEgreso>=mesProduccion;
+  }
+  return false;
+}
+
 function diasDescuento(plant,ced,quincena){
   // La 1era quincena paga el bono del MES ANTERIOR → buscar incidencias del mes anterior
   // La 2da quincena paga el MES ACTUAL → buscar incidencias del mes actual
@@ -4676,7 +4883,7 @@ function runCalculo(){
   // tomar el mes de pago del selector
   const selMP=document.getElementById('calcMesPago'); if(selMP)MES_PAGO=selMP.value;
   const params=PARAMS[plant];
-  const workers=plantRows().filter(w=>w.estado==='activo').sort((a,b)=>(+a.cedula||0)-(+b.cedula||0));
+  const workers=plantRows().filter(w=>esActivoParaCalculo(w,quincena)).sort((a,b)=>(+a.cedula||0)-(+b.cedula||0));
   const conceptos={};
 
   if(quincena==='q1'){
@@ -5082,7 +5289,7 @@ function autoMesPago(){
 
 /* Calcula las líneas de UNA planta para el memo (formato oficial). */
 function memoLineasPlanta(plant,quincena){
-  const workers=(plant==='choco'?DATA_PERSONAL.choco:DATA_PERSONAL.isidora).filter(w=>w.estado==='activo');
+  const workers=(plant==='choco'?DATA_PERSONAL.choco:DATA_PERSONAL.isidora).filter(w=>esActivoParaCalculo(w,quincena));
   const periodoBase=(quincena==='q1'?'PRIMERA':'SEGUNDA')+' QUINCENA '+mesPagoLabel();
   const lineas=[];
   const cobran=new Set();
@@ -5372,7 +5579,7 @@ function exportListado(name){
 function _asigParam(w){ return ({2:'ADM',2.5:'CONEXO',3:'OPERATIVO'})[w.asignacion]||(w.categoria||'OPERATIVO'); }
 
 function _listaQ1(plant){
-  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>w.estado==='activo').sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
+  const workers=(DATA_PERSONAL[plant]||[]).filter(w=>esActivoParaCalculo(w,'q1')).sort((a,b)=>(parseInt(a.cedula,10)||0)-(parseInt(b.cedula,10)||0));
   const out=[];
   workers.forEach(w=>{
     if(plant==='isidora'&&normCed(w.cedula)==='14976179') return; // Nobel Malave — solo Q2 en Isidora
@@ -5749,7 +5956,8 @@ function exportResumen(){
     {k:'cruce_result',       t:'scalar', ref:function(){return CRUCE_RESULT;}, set:function(v){ CRUCE_RESULT=v; }},
     {k:'bio_marks',          t:'obj', ref:function(){return BIO_MARKS;}},
     {k:'bio_files',          t:'arr', ref:function(){return BIO_FILES;}},
-    {k:'logo',               t:'scalar', ref:function(){return LOGO_DATA;}, set:function(v){ LOGO_DATA=v; var img=document.getElementById('logoImg'); if(img && v){ img.src=v; img.style.display=''; } }}
+    {k:'logo',               t:'scalar', ref:function(){return LOGO_DATA;}, set:function(v){ LOGO_DATA=v; var img=document.getElementById('logoImg'); if(img && v){ img.src=v; img.style.display=''; } }},
+    {k:'desc_historial',     t:'obj', ref:function(){return DESC_HISTORIAL;}}
   ];
   function applyValue(item, val){
     if(item.t==='scalar'){ if(item.set) item.set(val); return; }
