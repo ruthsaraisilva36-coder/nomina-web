@@ -5194,13 +5194,13 @@ function renderConceptos(){
     if(isBs){
       head=`<tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Cargo</th><th>Días pag.</th><th>Desc.</th><th>Monto Bs ($50)</th><th>Firma</th></tr>`;
       rows=c.lista.slice(0,700).map((x,i)=>
-        `<tr><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${x.cargo||''}</td>
+        `<tr data-search="${(x.nombre||'').toLowerCase()} ${x.ced}"><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${x.cargo||''}</td>
           <td>${x.diasPagados}</td><td>${x.desc||0}</td>
           <td class="money"><b>${fmt(x.alimBs)}</b></td><td style="width:80px"></td></tr>`).join('');
     }else if(isQ2){
       head=`<tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Días pag.</th><th>Asistencia</th><th>Alimentación</th><th>IPE</th><th>Retro.</th><th>Desc.16-30</th><th>Total</th><th>Firma</th></tr>`;
       rows=c.lista.slice(0,700).map((x,i)=>
-        `<tr><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${x.diasPagados}</td>
+        `<tr data-search="${(x.nombre||'').toLowerCase()} ${x.ced}"><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${x.diasPagados}</td>
           <td class="money">${fmt2(x.asist)}</td><td class="money">${fmt2(x.alim)}</td>
           <td class="money">${x.ipe?fmt2(x.ipe):'0'}${x.diasIPE>=16?' ⚠':''}</td>
           <td class="money" style="color:${x.retro>0?'var(--ok)':x.retro<0?'var(--bad)':'var(--muted)'}">${x.retro?(x.retro>0?'+':'')+fmt2(x.retro):'—'}</td>
@@ -5209,7 +5209,7 @@ function renderConceptos(){
     }else{
       head=`<tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Categoría</th><th>Base</th><th>Desc.</th><th>Días pag.</th><th>Retro.</th><th>Total</th><th>Firma</th></tr>`;
       rows=c.lista.slice(0,700).map((x,i)=>
-        `<tr><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${catPill(x.cat)}</td>
+        `<tr data-search="${(x.nombre||'').toLowerCase()} ${x.ced}"><td style="color:var(--muted);font-weight:600">${i+1}</td><td>${x.ced}</td><td>${x.nombre||''}</td><td>${catPill(x.cat)}</td>
           <td class="money">${fmt(x.base)}</td><td>${x.desc||0}</td><td>${x.diasPagados}</td>
           <td class="money" style="color:${x.retro>0?'var(--ok)':x.retro<0?'var(--bad)':'var(--muted)'}">${x.retro?(x.retro>0?'+':'')+fmt2(x.retro):'—'}</td>
           <td class="money"><b>$${fmt(x.pago)}</b></td><td style="width:80px"></td></tr>`).join('');
@@ -5223,6 +5223,7 @@ function renderConceptos(){
       : c.noSuma
         ? `<span class="ctot" style="color:#5a3a86">$${fmt(c.tot)} <small style="font-weight:400;color:var(--muted)">(pago en Bs — NO suma al total divisa)</small></span>`
         : `<span class="ctot">$${fmt(c.tot)}</span>`;
+    const safeId=name.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div class="concept-card">
       <div class="concept-head">
         <span class="cname">${name}</span>
@@ -5233,11 +5234,26 @@ function renderConceptos(){
         </div>
         <span class="cmeta">${c.lista.length} trabajadores · listado de pago con firma de cada trabajador + Coordinación de Gestión Humana y Gerente General</span>
       </div>
+      <div style="padding:10px 14px;border-bottom:1px solid var(--line)">
+        <input type="search" placeholder="Buscar por cédula o nombre…" oninput="filtrarListado('${safeId}',this.value)"
+          style="width:100%;max-width:360px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit">
+      </div>
       <div class="tscroll" style="max-height:400px">
-        <table class="memo-table" style="margin:0">${head}${rows}</table>
+        <table class="memo-table" style="margin:0" id="tblListado_${safeId}"><thead>${head}</thead><tbody>${rows}</tbody></table>
       </div>
     </div>`;
   }).join('');
+}
+/* Filtrar filas de un listado de pago por cédula o nombre */
+function filtrarListado(safeId,q){
+  const tbl=document.getElementById('tblListado_'+safeId);
+  if(!tbl)return;
+  const query=q.toLowerCase().trim();
+  tbl.querySelectorAll('tbody tr').forEach(tr=>{
+    if(!query){tr.style.display='';return;}
+    const data=tr.getAttribute('data-search')||'';
+    tr.style.display=data.includes(query)?'':'none';
+  });
 }
 
 function memoHeaderHTML(titulo){
